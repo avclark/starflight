@@ -28,6 +28,8 @@ export default async function DashboardPage() {
   const showMap = new Map((shows ?? []).map((s) => [s.id, s.name]));
   const workflowMap = new Map((workflows ?? []).map((w) => [w.id, w.name]));
 
+  // TODO: When auth is added, filter by current user's ID:
+  // .eq("assigned_user_id", currentUserId)
   const { data: tasks } = await supabase
     .from("tasks")
     .select("*")

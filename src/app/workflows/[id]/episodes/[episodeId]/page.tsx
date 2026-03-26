@@ -31,6 +31,24 @@ export default async function EpisodeDetailPage({
     .eq("is_visible", true)
     .order("position");
 
+  // Fetch assigned user names
+  const assignedUserIds = [
+    ...new Set(
+      (tasks ?? [])
+        .map((t) => t.assigned_user_id)
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const { data: assignedUsers } = assignedUserIds.length
+    ? await supabase
+        .from("users")
+        .select("id, full_name")
+        .in("id", assignedUserIds)
+    : { data: [] };
+  const userMap = Object.fromEntries(
+    (assignedUsers ?? []).map((u) => [u.id, u.full_name])
+  );
+
   return (
     <EpisodeDetail
       workflowId={workflowId}
@@ -42,6 +60,7 @@ export default async function EpisodeDetailPage({
         show_name: show?.name ?? null,
       }}
       tasks={tasks ?? []}
+      userMap={userMap}
     />
   );
 }

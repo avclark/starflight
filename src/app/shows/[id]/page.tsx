@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ShowHeader } from "./show-header";
+import { RoleAssignmentsTab } from "./role-assignments-tab";
 
 export default async function ShowDetailPage({
   params,
@@ -45,6 +46,31 @@ export default async function ShowDetailPage({
     (workflows ?? []).map((w) => [w.id, w.name])
   );
 
+  // Roles data for assignments tab
+  const { data: roles } = await supabase
+    .from("roles")
+    .select("id, name")
+    .order("display_order");
+
+  const { data: roleMembers } = await supabase
+    .from("role_members")
+    .select("role_id, user_id");
+
+  const memberUserIds = [
+    ...new Set((roleMembers ?? []).map((rm) => rm.user_id)),
+  ];
+  const { data: people } = memberUserIds.length
+    ? await supabase
+        .from("users")
+        .select("id, full_name")
+        .in("id", memberUserIds)
+    : { data: [] };
+
+  const { data: currentAssignments } = await supabase
+    .from("show_role_assignments")
+    .select("role_id, user_id")
+    .eq("show_id", id);
+
   return (
     <div className="space-y-6">
       <ShowHeader showId={id} name={show.name} />
@@ -69,16 +95,13 @@ export default async function ShowDetailPage({
           </Card>
         </TabsContent>
         <TabsContent value="roles">
-          <Card>
-            <CardHeader>
-              <CardTitle>Role Assignments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Role assignments for this show will appear here.
-              </p>
-            </CardContent>
-          </Card>
+          <RoleAssignmentsTab
+            showId={id}
+            roles={roles ?? []}
+            roleMembers={roleMembers ?? []}
+            people={people ?? []}
+            currentAssignments={currentAssignments ?? []}
+          />
         </TabsContent>
         <TabsContent value="episodes">
           <div className="rounded-md border">

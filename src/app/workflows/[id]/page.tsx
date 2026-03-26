@@ -1,7 +1,5 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EpisodesTab } from "./episodes-tab";
 import { WorkflowHeader } from "./workflow-header";
 
@@ -64,33 +62,13 @@ export default async function WorkflowDetailPage({
         processes={processes ?? []}
       />
 
-      <Tabs defaultValue="episodes">
-        <TabsList>
-          <TabsTrigger value="episodes">Episodes</TabsTrigger>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
-        </TabsList>
-        <TabsContent value="episodes">
-          <EpisodesTab
-            workflowId={id}
-            processId={workflow.process_id}
-            itemLabel={workflow.item_label}
-            episodes={episodesWithShows}
-            shows={shows ?? []}
-          />
-        </TabsContent>
-        <TabsContent value="roles">
-          <Card>
-            <CardHeader>
-              <CardTitle>Roles</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Role definitions for this workflow will appear here.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <EpisodesTab
+        workflowId={id}
+        processId={workflow.process_id}
+        itemLabel={workflow.item_label}
+        episodes={episodesWithShows}
+        shows={shows ?? []}
+      />
     </div>
   );
 }

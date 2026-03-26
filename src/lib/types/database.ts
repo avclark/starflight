@@ -162,21 +162,39 @@ export interface Database {
       roles: {
         Row: {
           id: string;
-          workflow_id: string;
           name: string;
           display_order: number;
+          created_at: string;
         };
         Insert: {
           id?: string;
-          workflow_id: string;
           name: string;
           display_order?: number;
+          created_at?: string;
         };
         Update: {
           id?: string;
-          workflow_id?: string;
           name?: string;
           display_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      role_members: {
+        Row: {
+          id: string;
+          role_id: string;
+          user_id: string;
+        };
+        Insert: {
+          id?: string;
+          role_id: string;
+          user_id: string;
+        };
+        Update: {
+          id?: string;
+          role_id?: string;
+          user_id?: string;
         };
         Relationships: [];
       };

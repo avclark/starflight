@@ -25,10 +25,25 @@ export default async function ProcessDetailPage({
     .eq("process_id", id)
     .order("position");
 
+  const { data: roles } = await supabase
+    .from("roles")
+    .select("id, name")
+    .order("display_order");
+
+  const { data: people } = await supabase
+    .from("users")
+    .select("id, full_name")
+    .order("full_name");
+
   return (
     <div className="space-y-6">
       <ProcessHeader processId={id} name={processData.name} />
-      <TaskTemplateList processId={id} templates={templates ?? []} />
+      <TaskTemplateList
+        processId={id}
+        templates={templates ?? []}
+        roles={roles ?? []}
+        people={people ?? []}
+      />
     </div>
   );
 }

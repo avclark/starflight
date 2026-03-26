@@ -73,6 +73,30 @@ export async function deleteTaskTemplate(templateId: string, processId: string) 
   return { success: true };
 }
 
+export async function updateTaskTemplateAssignment(
+  templateId: string,
+  processId: string,
+  assignmentMode: "none" | "user" | "role",
+  assignedUserId: string | null,
+  assignedRoleId: string | null
+) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("task_templates")
+    .update({
+      assignment_mode: assignmentMode,
+      assigned_user_id: assignmentMode === "user" ? assignedUserId : null,
+      assigned_role_id: assignmentMode === "role" ? assignedRoleId : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", templateId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/processes/${processId}`);
+  return { success: true };
+}
+
 export async function deleteProcess(processId: string) {
   const supabase = await createClient();
 

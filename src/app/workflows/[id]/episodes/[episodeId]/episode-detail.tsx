@@ -65,10 +65,12 @@ function TaskRow({
   task,
   workflowId,
   episodeId,
+  assignedName,
 }: {
   task: Task;
   workflowId: string;
   episodeId: string;
+  assignedName?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -138,6 +140,12 @@ function TaskRow({
           >
             {task.title}
           </span>
+
+          {assignedName && (
+            <Badge variant="outline" className="text-xs font-normal">
+              {assignedName}
+            </Badge>
+          )}
 
           {dateRange && (
             <span
@@ -281,6 +289,7 @@ export function EpisodeDetail({
   workflowId,
   episode,
   tasks,
+  userMap = {},
 }: {
   workflowId: string;
   episode: {
@@ -291,6 +300,7 @@ export function EpisodeDetail({
     show_name: string | null;
   };
   tasks: Task[];
+  userMap?: Record<string, string>;
 }) {
   return (
     <div className="space-y-6">
@@ -345,6 +355,11 @@ export function EpisodeDetail({
               task={task}
               workflowId={workflowId}
               episodeId={episode.id}
+              assignedName={
+                task.assigned_user_id
+                  ? userMap[task.assigned_user_id]
+                  : undefined
+              }
             />
           ))
         )}

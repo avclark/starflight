@@ -29,23 +29,44 @@ export async function createEpisode(
 
   if (episodeError || !episode) return { error: episodeError?.message ?? "Failed to create episode" };
 
-  // Fetch task templates for this process
+  // Fetch task templates for this process (including assignment fields)
   const { data: templates } = await supabase
     .from("task_templates")
-    .select("id, title, position")
+    .select("id, title, position, assignment_mode, assigned_role_id, assigned_user_id")
     .eq("process_id", processId)
     .order("position");
 
-  // Create task instances from templates
   if (templates && templates.length > 0) {
-    const tasks = templates.map((t) => ({
-      episode_id: episode.id,
-      task_template_id: t.id,
-      title: t.title,
-      position: t.position,
-      status: "open" as const,
-      is_visible: true,
-    }));
+    // Fetch show role assignments for role-based resolution
+    const { data: showAssignments } = await supabase
+      .from("show_role_assignments")
+      .select("role_id, user_id")
+      .eq("show_id", showId);
+
+    const roleAssignmentMap = new Map(
+      (showAssignments ?? []).map((a) => [a.role_id, a.user_id])
+    );
+
+    // Create task instances with resolved assignments
+    const tasks = templates.map((t) => {
+      let assignedUserId: string | null = null;
+
+      if (t.assignment_mode === "user") {
+        assignedUserId = t.assigned_user_id;
+      } else if (t.assignment_mode === "role" && t.assigned_role_id) {
+        assignedUserId = roleAssignmentMap.get(t.assigned_role_id) ?? null;
+      }
+
+      return {
+        episode_id: episode.id,
+        task_template_id: t.id,
+        title: t.title,
+        position: t.position,
+        status: "open" as const,
+        is_visible: true,
+        assigned_user_id: assignedUserId,
+      };
+    });
 
     const { error: tasksError } = await supabase.from("tasks").insert(tasks);
     if (tasksError) return { error: tasksError.message };
