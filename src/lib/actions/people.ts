@@ -16,3 +16,26 @@ export async function createPerson(formData: FormData) {
   revalidatePath("/people");
   return { success: true };
 }
+
+export async function deletePerson(userId: string) {
+  const supabase = await createClient();
+
+  // Check for task assignments
+  const { count } = await supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("assigned_user_id", userId)
+    .eq("status", "open");
+
+  if (count && count > 0) {
+    return {
+      error: `This person has ${count} open task${count > 1 ? "s" : ""} assigned. Reassign them before deleting.`,
+    };
+  }
+
+  const { error } = await supabase.from("users").delete().eq("id", userId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/people");
+  return { success: true };
+}

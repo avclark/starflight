@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProcessHeader } from "./process-header";
+import { TaskTemplateList } from "./task-template-list";
 
 export default async function ProcessDetailPage({
   params,
@@ -9,6 +10,7 @@ export default async function ProcessDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+
   const { data: processData } = await supabase
     .from("processes")
     .select("*")
@@ -17,21 +19,16 @@ export default async function ProcessDetailPage({
 
   if (!processData) notFound();
 
+  const { data: templates } = await supabase
+    .from("task_templates")
+    .select("*")
+    .eq("process_id", id)
+    .order("position");
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {processData.name}
-      </h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Process Builder</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Process builder coming in Phase 5.
-          </p>
-        </CardContent>
-      </Card>
+      <ProcessHeader processId={id} name={processData.name} />
+      <TaskTemplateList processId={id} templates={templates ?? []} />
     </div>
   );
 }

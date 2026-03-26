@@ -2,16 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,7 +29,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createWorkflow } from "@/lib/actions/workflows";
+import {
+  createWorkflow,
+  deleteWorkflow,
+  deleteWorkflowConfirmed,
+} from "@/lib/actions/workflows";
 import type { Tables } from "@/lib/types/database";
 
 type Process = Pick<Tables<"processes">, "id" | "name">;
@@ -34,10 +46,44 @@ export function WorkflowsGrid({
   processes: Process[];
 }) {
   const [open, setOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Tables<"workflows"> | null>(
+    null
+  );
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [hasEpisodes, setHasEpisodes] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     const result = await createWorkflow(formData);
     if (result.success) setOpen(false);
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+
+    if (hasEpisodes) {
+      // User already confirmed — force delete
+      const result = await deleteWorkflowConfirmed(deleteTarget.id);
+      if (result.error) {
+        setDeleteError(result.error);
+      } else {
+        setDeleteTarget(null);
+        setDeleteError(null);
+        setHasEpisodes(false);
+      }
+      return;
+    }
+
+    const result = await deleteWorkflow(deleteTarget.id);
+    if (result.error && result.needsConfirmation) {
+      // Show the warning but let them proceed
+      setDeleteError(result.error);
+      setHasEpisodes(true);
+    } else if (result.error) {
+      setDeleteError(result.error);
+    } else {
+      setDeleteTarget(null);
+      setDeleteError(null);
+    }
   }
 
   return (
@@ -103,21 +149,92 @@ export function WorkflowsGrid({
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {workflows.map((workflow) => (
-            <Link key={workflow.id} href={`/workflows/${workflow.id}`}>
-              <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
-                <CardHeader>
-                  <CardTitle className="text-base">{workflow.name}</CardTitle>
-                </CardHeader>
+            <Card
+              key={workflow.id}
+              className="hover:bg-accent/50 transition-colors relative"
+            >
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <Link href={`/workflows/${workflow.id}`} className="flex-1">
+                  <CardTitle className="text-base cursor-pointer hover:underline">
+                    {workflow.name}
+                  </CardTitle>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setHasEpisodes(false);
+                        setDeleteTarget(workflow);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <Link href={`/workflows/${workflow.id}`}>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
                     Item label: {workflow.item_label}
                   </p>
                 </CardContent>
-              </Card>
-            </Link>
+              </Link>
+            </Card>
           ))}
         </div>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+            setHasEpisodes(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Workflow</DialogTitle>
+            <DialogDescription>
+              {hasEpisodes
+                ? `This will permanently delete "${deleteTarget?.name}" and all its episodes and tasks.`
+                : `Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+                setHasEpisodes(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              {hasEpisodes ? "Delete Everything" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

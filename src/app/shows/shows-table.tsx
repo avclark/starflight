@@ -3,15 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -23,15 +31,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { createShow } from "@/lib/actions/shows";
+import { createShow, deleteShow } from "@/lib/actions/shows";
 import type { Tables } from "@/lib/types/database";
 
 export function ShowsTable({ shows }: { shows: Tables<"shows">[] }) {
   const [open, setOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Tables<"shows"> | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleSubmit(formData: FormData) {
     const result = await createShow(formData);
     if (result.success) setOpen(false);
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    const result = await deleteShow(deleteTarget.id);
+    if (result.error) {
+      setDeleteError(result.error);
+    } else {
+      setDeleteTarget(null);
+      setDeleteError(null);
+    }
   }
 
   return (
@@ -68,13 +89,14 @@ export function ShowsTable({ shows }: { shows: Tables<"shows">[] }) {
               <TableHead>Name</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {shows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={4}
                   className="text-center text-muted-foreground py-8"
                 >
                   No shows yet. Create one to get started.
@@ -103,12 +125,70 @@ export function ShowsTable({ shows }: { shows: Tables<"shows">[] }) {
                   <TableCell className="text-muted-foreground">
                     {format(new Date(show.created_at), "MMM d, yyyy")}
                   </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteTarget(show);
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Show</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &ldquo;{deleteTarget?.name}&rdquo;?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
