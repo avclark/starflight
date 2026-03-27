@@ -240,6 +240,19 @@ export async function createEpisode(
 
     const { error: tasksError } = await supabase.from("tasks").insert(tasks);
     if (tasksError) return { error: tasksError.message };
+
+    // Send notifications for assigned tasks
+    const assignedTasks = tasks.filter((t) => t.assigned_user_id && t.is_visible);
+    if (assignedTasks.length > 0) {
+      const notifications = assignedTasks.map((t) => ({
+        user_id: t.assigned_user_id!,
+        type: "task_assigned",
+        title: `New task assigned: ${t.title}`,
+        body: `You've been assigned "${t.title}" in episode "${title}".`,
+        link: `/workflows/${workflowId}/episodes/${episode.id}`,
+      }));
+      await supabase.from("notifications").insert(notifications);
+    }
   }
 
   revalidatePath(`/workflows/${workflowId}`);

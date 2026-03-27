@@ -102,6 +102,36 @@ export default async function EpisodeDetailPage({
     .select("id, full_name")
     .order("full_name");
 
+  // Email templates for tasks with send_email actions
+  const { data: emailTemplates } = templateIds.length
+    ? await supabase
+        .from("task_template_email_templates")
+        .select("*")
+        .in("task_template_id", templateIds)
+    : { data: [] };
+
+  // Show settings for token resolution
+  const { data: showSettings } = await supabase
+    .from("show_setting_values")
+    .select("setting_definition_id, value_json")
+    .eq("show_id", episode.show_id);
+
+  const { data: settingDefs } = await supabase
+    .from("show_setting_definitions")
+    .select("id, label");
+
+  // Build show settings map: label → value
+  const settingDefMap = new Map((settingDefs ?? []).map((d) => [d.id, d.label]));
+  const showSettingsMap: Record<string, string> = {};
+  for (const sv of showSettings ?? []) {
+    const label = settingDefMap.get(sv.setting_definition_id);
+    if (label) {
+      const val = sv.value_json;
+      showSettingsMap[label] =
+        val === true ? "Yes" : val === false ? "No" : String(val ?? "");
+    }
+  }
+
   return (
     <EpisodeDetail
       workflowId={workflowId}
@@ -118,6 +148,8 @@ export default async function EpisodeDetailPage({
       blockResponses={blockResponses ?? []}
       comments={comments ?? []}
       people={allPeople ?? []}
+      emailTemplates={emailTemplates ?? []}
+      showSettingsMap={showSettingsMap}
     />
   );
 }

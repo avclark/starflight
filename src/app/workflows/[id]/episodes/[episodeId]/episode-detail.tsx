@@ -43,12 +43,14 @@ import {
   renameEpisode,
 } from "@/lib/actions/episodes";
 import { saveTaskBlockResponses } from "@/lib/actions/blocks";
+import { EmailPreview } from "./email-preview";
 import type { Tables, Json } from "@/lib/types/database";
 
 type Task = Tables<"tasks">;
 type Block = Tables<"task_template_blocks">;
 type BlockResponse = Tables<"task_block_responses">;
 type Comment = Tables<"task_comments">;
+type EmailTpl = Tables<"task_template_email_templates">;
 type Person = { id: string; full_name: string };
 
 function isOverdue(dueDate: string | null, status: string) {
@@ -66,6 +68,12 @@ function TaskRow({
   comments,
   userMap,
   people,
+  emailTemplate,
+  episodeTitle,
+  showName,
+  showSettingsMap,
+  allBlocks,
+  allResponses,
 }: {
   task: Task;
   workflowId: string;
@@ -76,6 +84,12 @@ function TaskRow({
   comments: Comment[];
   userMap: Record<string, string>;
   people: Person[];
+  emailTemplate?: EmailTpl | null;
+  episodeTitle: string;
+  showName: string;
+  showSettingsMap: Record<string, string>;
+  allBlocks: Block[];
+  allResponses: BlockResponse[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -289,6 +303,23 @@ function TaskRow({
               )}
             </div>
 
+            {emailTemplate && (
+              <>
+                <Separator />
+                <EmailPreview
+                  emailTemplate={emailTemplate}
+                  episodeTitle={episodeTitle}
+                  showName={showName}
+                  showSettingsMap={showSettingsMap}
+                  allBlocks={allBlocks}
+                  allResponses={allResponses}
+                  taskId={task.id}
+                  episodeId={episodeId}
+                  workflowId={workflowId}
+                />
+              </>
+            )}
+
             {blocks.some((b) => b.block_type === "comments") && (
               <>
                 <Separator />
@@ -338,6 +369,8 @@ export function EpisodeDetail({
   blockResponses = [],
   comments = [],
   people = [],
+  emailTemplates = [],
+  showSettingsMap = {},
 }: {
   workflowId: string;
   episode: {
@@ -353,6 +386,8 @@ export function EpisodeDetail({
   blockResponses?: BlockResponse[];
   comments?: Comment[];
   people?: Person[];
+  emailTemplates?: EmailTpl[];
+  showSettingsMap?: Record<string, string>;
 }) {
   return (
     <div className="space-y-6">
@@ -421,6 +456,16 @@ export function EpisodeDetail({
               comments={comments.filter((c) => c.task_id === task.id)}
               userMap={userMap}
               people={people}
+              emailTemplate={
+                emailTemplates.find(
+                  (e) => e.task_template_id === task.task_template_id
+                ) ?? null
+              }
+              episodeTitle={episode.title}
+              showName={episode.show_name ?? ""}
+              showSettingsMap={showSettingsMap}
+              allBlocks={templateBlocks}
+              allResponses={blockResponses}
             />
           ))
         )}

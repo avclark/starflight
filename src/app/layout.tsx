@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { NotificationBell } from "@/components/notification-bell";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -34,6 +35,9 @@ export default function RootLayout({
         <SidebarProvider defaultOpen={true}>
           <AppSidebar />
           <SidebarInset>
+            <div className="flex items-center justify-end border-b px-6 py-2">
+              <NotificationBell />
+            </div>
             <div className="flex-1 p-6">{children}</div>
           </SidebarInset>
         </SidebarProvider>

@@ -43,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { InlineEdit } from "@/components/inline-edit";
+import { ActionsSection } from "./actions-section";
 import { ContentSection } from "./content-section";
 import { DatesSection } from "./dates-section";
 import {
@@ -66,6 +67,8 @@ type VisRule = Tables<"task_template_visibility_rules">;
 type Dep = Tables<"task_template_dependencies">;
 type Block = Tables<"task_template_blocks">;
 type DateRuleRow = Tables<"task_template_date_rules">;
+type CompAction = Tables<"task_template_completion_actions">;
+type EmailTpl = Tables<"task_template_email_templates">;
 
 // ─── Assignment Section ──────────────────────────────────────
 function AssignmentSection({
@@ -422,6 +425,8 @@ export function TaskTemplateList({
   dependencies,
   blocks,
   dateRules,
+  completionActions,
+  emailTemplates,
 }: {
   processId: string;
   templates: Tables<"task_templates">[];
@@ -432,6 +437,8 @@ export function TaskTemplateList({
   dependencies: Dep[];
   blocks: Block[];
   dateRules: DateRuleRow[];
+  completionActions: CompAction[];
+  emailTemplates: EmailTpl[];
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<"task_templates"> | null>(null);
@@ -667,7 +674,12 @@ export function TaskTemplateList({
                           />
                         </TabsContent>
                         <TabsContent value="actions" className="mt-3">
-                          <p className="text-xs text-muted-foreground">Completion actions coming in Phase 7.</p>
+                          <ActionsSection
+                            taskTemplateId={t.id}
+                            processId={processId}
+                            existingActions={completionActions.filter((a) => a.task_template_id === t.id)}
+                            existingEmailTemplate={emailTemplates.find((e) => e.task_template_id === t.id) ?? null}
+                          />
                         </TabsContent>
                       </Tabs>
                     </div>
