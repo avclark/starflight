@@ -7,6 +7,7 @@ import {
   GitBranch,
   Blocks,
   Radio,
+  Settings,
   Users,
 } from "lucide-react";
 
@@ -27,6 +28,7 @@ const navItems = [
   { title: "Processes", href: "/processes", icon: Blocks },
   { title: "Shows", href: "/shows", icon: Radio },
   { title: "People", href: "/people", icon: Users },
+  { title: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

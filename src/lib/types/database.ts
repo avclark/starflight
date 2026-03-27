@@ -229,6 +229,7 @@ export interface Database {
           assignment_mode: "role" | "user" | "none";
           assigned_role_id: string | null;
           assigned_user_id: string | null;
+          visibility_logic: "and" | "or";
           created_at: string;
           updated_at: string;
         };
@@ -241,6 +242,7 @@ export interface Database {
           assignment_mode?: "role" | "user" | "none";
           assigned_role_id?: string | null;
           assigned_user_id?: string | null;
+          visibility_logic?: "and" | "or";
           created_at?: string;
           updated_at?: string;
         };
@@ -253,6 +255,7 @@ export interface Database {
           assignment_mode?: "role" | "user" | "none";
           assigned_role_id?: string | null;
           assigned_user_id?: string | null;
+          visibility_logic?: "and" | "or";
           created_at?: string;
           updated_at?: string;
         };

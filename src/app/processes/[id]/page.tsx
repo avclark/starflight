@@ -35,6 +35,19 @@ export default async function ProcessDetailPage({
     .select("id, full_name")
     .order("full_name");
 
+  const { data: settingDefinitions } = await supabase
+    .from("show_setting_definitions")
+    .select("id, label")
+    .order("display_order");
+
+  const { data: visibilityRules } = await supabase
+    .from("task_template_visibility_rules")
+    .select("*");
+
+  const { data: dependencies } = await supabase
+    .from("task_template_dependencies")
+    .select("*");
+
   return (
     <div className="space-y-6">
       <ProcessHeader processId={id} name={processData.name} />
@@ -43,6 +56,9 @@ export default async function ProcessDetailPage({
         templates={templates ?? []}
         roles={roles ?? []}
         people={people ?? []}
+        settingDefinitions={settingDefinitions ?? []}
+        visibilityRules={visibilityRules ?? []}
+        dependencies={dependencies ?? []}
       />
     </div>
   );

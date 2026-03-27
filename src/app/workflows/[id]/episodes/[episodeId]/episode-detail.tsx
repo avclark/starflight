@@ -85,6 +85,7 @@ function TaskRow({
   const dateRange = formatDateRange(task.start_date, task.due_date);
   const overdue = isOverdue(task.due_date, task.status);
   const isCompleted = task.status === "completed";
+  const isBlocked = task.status === "blocked";
 
   async function handleToggleComplete() {
     if (isCompleted) {
@@ -122,6 +123,7 @@ function TaskRow({
             <Checkbox
               checked={isCompleted}
               onCheckedChange={handleToggleComplete}
+              disabled={isBlocked}
             />
           </div>
 
@@ -135,7 +137,11 @@ function TaskRow({
 
           <span
             className={`flex-1 text-sm ${
-              isCompleted ? "line-through text-muted-foreground" : ""
+              isCompleted
+                ? "line-through text-muted-foreground"
+                : isBlocked
+                ? "text-muted-foreground"
+                : ""
             }`}
           >
             {task.title}

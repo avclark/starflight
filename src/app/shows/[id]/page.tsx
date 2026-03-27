@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ShowHeader } from "./show-header";
+import { ShowSettingsTab } from "./show-settings-tab";
 import { RoleAssignmentsTab } from "./role-assignments-tab";
 
 export default async function ShowDetailPage({
@@ -29,6 +30,17 @@ export default async function ShowDetailPage({
     .single();
 
   if (!show) notFound();
+
+  // Show settings data
+  const { data: settingDefinitions } = await supabase
+    .from("show_setting_definitions")
+    .select("*")
+    .order("display_order");
+
+  const { data: settingValues } = await supabase
+    .from("show_setting_values")
+    .select("*")
+    .eq("show_id", id);
 
   const { data: episodes } = await supabase
     .from("episodes")
@@ -82,17 +94,11 @@ export default async function ShowDetailPage({
           <TabsTrigger value="episodes">Episodes</TabsTrigger>
         </TabsList>
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Show Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Show settings and conditional logic configuration will appear
-                here.
-              </p>
-            </CardContent>
-          </Card>
+          <ShowSettingsTab
+            showId={id}
+            definitions={settingDefinitions ?? []}
+            values={settingValues ?? []}
+          />
         </TabsContent>
         <TabsContent value="roles">
           <RoleAssignmentsTab
