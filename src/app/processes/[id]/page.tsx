@@ -53,6 +53,10 @@ export default async function ProcessDetailPage({
     .select("*")
     .order("display_order");
 
+  const { data: dateRules } = await supabase
+    .from("task_template_date_rules")
+    .select("*");
+
   return (
     <div className="space-y-6">
       <ProcessHeader processId={id} name={processData.name} />
@@ -65,6 +69,7 @@ export default async function ProcessDetailPage({
         visibilityRules={visibilityRules ?? []}
         dependencies={dependencies ?? []}
         blocks={blocks ?? []}
+        dateRules={dateRules ?? []}
       />
     </div>
   );

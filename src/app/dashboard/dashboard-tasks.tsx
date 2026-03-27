@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { format, isPast } from "date-fns";
+import { isPast } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ClientDate } from "@/components/client-date";
 import { completeTask, uncompleteTask } from "@/lib/actions/episodes";
 import type { Tables } from "@/lib/types/database";
 
@@ -61,15 +62,14 @@ export function DashboardTasks({ tasks }: { tasks: TaskWithEpisode[] }) {
               </p>
             </div>
             {task.due_date && (
-              <span
+              <ClientDate
+                date={task.due_date}
                 className={`text-xs tabular-nums shrink-0 ${
                   overdue
                     ? "text-destructive font-medium"
                     : "text-muted-foreground"
                 }`}
-              >
-                {format(new Date(task.due_date), "MMM d")}
-              </span>
+              />
             )}
           </div>
         );

@@ -107,6 +107,20 @@ export async function createEpisode(
       .select("task_template_id, depends_on_task_template_id")
       .in("task_template_id", templateIds);
 
+    // Fetch date rules
+    const { data: dateRules } = await supabase
+      .from("task_template_date_rules")
+      .select("*")
+      .in("task_template_id", templateIds);
+
+    // Group date rules by template
+    const dateRulesByTemplate = new Map<string, typeof dateRules>();
+    for (const r of dateRules ?? []) {
+      const arr = dateRulesByTemplate.get(r.task_template_id) ?? [];
+      arr.push(r);
+      dateRulesByTemplate.set(r.task_template_id, arr);
+    }
+
     // Group visibility rules and deps by template
     const rulesByTemplate = new Map<string, typeof visRules>();
     for (const r of visRules ?? []) {
@@ -180,8 +194,49 @@ export async function createEpisode(
         status,
         is_visible: isVisible,
         assigned_user_id: assignedUserId,
+        start_date: null as string | null,
+        due_date: null as string | null,
       };
     });
+
+    // Calculate dates from rules
+    const episodeCreatedAt = new Date();
+    // Build a map of template_id → task (for cross-referencing dates)
+    const taskByTemplateId = new Map(tasks.map((t) => [t.task_template_id, t]));
+
+    for (const task of tasks) {
+      const rules = dateRulesByTemplate.get(task.task_template_id);
+      if (!rules) continue;
+
+      for (const rule of rules) {
+        let baseDate: Date | null = null;
+
+        if (rule.relative_to === "episode_start") {
+          baseDate = episodeCreatedAt;
+        } else if (rule.relative_task_template_id) {
+          const refTask = taskByTemplateId.get(rule.relative_task_template_id);
+          if (refTask) {
+            const refDateStr =
+              rule.relative_to === "task_start"
+                ? refTask.start_date
+                : refTask.due_date;
+            if (refDateStr) baseDate = new Date(refDateStr);
+          }
+        }
+
+        if (baseDate) {
+          const calculated = new Date(baseDate);
+          calculated.setDate(calculated.getDate() + rule.offset_days);
+          calculated.setHours(calculated.getHours() + rule.offset_hours);
+
+          if (rule.date_field === "start_date") {
+            task.start_date = calculated.toISOString();
+          } else {
+            task.due_date = calculated.toISOString();
+          }
+        }
+      }
+    }
 
     const { error: tasksError } = await supabase.from("tasks").insert(tasks);
     if (tasksError) return { error: tasksError.message };
@@ -282,8 +337,101 @@ export async function updateTaskDates(
 
   if (error) return { error: error.message };
 
+  // Cascade date recalculation
+  const cascadeCount = await cascadeDates(supabase, episodeId, taskId);
+
   revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
-  return { success: true };
+  return { success: true, cascadeCount };
+}
+
+async function cascadeDates(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  episodeId: string,
+  updatedTaskId: string
+): Promise<number> {
+  // Get the updated task's template id
+  const { data: updatedTask } = await supabase
+    .from("tasks")
+    .select("task_template_id, start_date, due_date")
+    .eq("id", updatedTaskId)
+    .single();
+
+  if (!updatedTask) return 0;
+
+  // Find all date rules that reference this task's template
+  const { data: dependentRules } = await supabase
+    .from("task_template_date_rules")
+    .select("*")
+    .eq("relative_task_template_id", updatedTask.task_template_id);
+
+  if (!dependentRules || dependentRules.length === 0) return 0;
+
+  // Get all tasks in this episode that use those templates
+  const dependentTemplateIds = [
+    ...new Set(dependentRules.map((r) => r.task_template_id)),
+  ];
+  const { data: dependentTasks } = await supabase
+    .from("tasks")
+    .select("id, task_template_id, start_date, due_date")
+    .eq("episode_id", episodeId)
+    .eq("is_visible", true)
+    .in("task_template_id", dependentTemplateIds);
+
+  if (!dependentTasks || dependentTasks.length === 0) return 0;
+
+  let totalUpdated = 0;
+  const visited = new Set<string>([updatedTaskId]);
+
+  for (const depTask of dependentTasks) {
+    if (visited.has(depTask.id)) continue;
+
+    // Get all date rules for this task's template
+    const rulesForTask = dependentRules.filter(
+      (r) => r.task_template_id === depTask.task_template_id
+    );
+
+    let newStartDate = depTask.start_date;
+    let newDueDate = depTask.due_date;
+    let changed = false;
+
+    for (const rule of rulesForTask) {
+      const refDateStr =
+        rule.relative_to === "task_start"
+          ? updatedTask.start_date
+          : updatedTask.due_date;
+
+      if (!refDateStr) continue;
+
+      const baseDate = new Date(refDateStr);
+      baseDate.setDate(baseDate.getDate() + rule.offset_days);
+      baseDate.setHours(baseDate.getHours() + rule.offset_hours);
+      const calculated = baseDate.toISOString();
+
+      if (rule.date_field === "start_date" && newStartDate !== calculated) {
+        newStartDate = calculated;
+        changed = true;
+      } else if (rule.date_field === "due_date" && newDueDate !== calculated) {
+        newDueDate = calculated;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await supabase
+        .from("tasks")
+        .update({ start_date: newStartDate, due_date: newDueDate })
+        .eq("id", depTask.id);
+
+      totalUpdated++;
+      visited.add(depTask.id);
+
+      // Recurse: cascade from this task too
+      const childCount = await cascadeDates(supabase, episodeId, depTask.id);
+      totalUpdated += childCount;
+    }
+  }
+
+  return totalUpdated;
 }
 
 export async function deleteTask(taskId: string, episodeId: string, workflowId: string) {

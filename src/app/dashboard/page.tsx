@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardTasks } from "./dashboard-tasks";
 import Link from "next/link";
-import { format } from "date-fns";
+import { ClientDate } from "@/components/client-date";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -93,9 +93,11 @@ export default async function DashboardPage() {
                         {ep.progress_percent}%
                       </span>
                     </div>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {format(new Date(ep.updated_at), "MMM d")}
-                    </span>
+                    <ClientDate
+                      date={ep.updated_at}
+                      fmt="MMM d"
+                      className="text-xs text-muted-foreground shrink-0"
+                    />
                   </Link>
                 ))}
               </div>

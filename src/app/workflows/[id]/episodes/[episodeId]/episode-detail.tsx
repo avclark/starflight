@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { toast } from "sonner";
+import { ClientDateRange } from "@/components/client-date";
 import {
   ArrowLeft,
   Check,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { DateTimePicker } from "@/components/date-time-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -30,11 +31,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
 import { TaskFormBlocks, validateRequiredBlocks } from "./task-form-blocks";
@@ -54,15 +50,6 @@ type Block = Tables<"task_template_blocks">;
 type BlockResponse = Tables<"task_block_responses">;
 type Comment = Tables<"task_comments">;
 type Person = { id: string; full_name: string };
-
-function formatDateRange(startDate: string | null, dueDate: string | null) {
-  if (!startDate && !dueDate) return null;
-  const s = startDate ? format(new Date(startDate), "MMM d") : null;
-  const d = dueDate ? format(new Date(dueDate), "MMM d") : null;
-  if (s && d) return `${s} → ${d}`;
-  if (s) return s;
-  return d;
-}
 
 function isOverdue(dueDate: string | null, status: string) {
   if (!dueDate || status === "completed") return false;
@@ -103,7 +90,6 @@ function TaskRow({
   const [blockDraft, setBlockDraft] = useState<Record<string, Json | null>>({});
   const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
 
-  const dateRange = formatDateRange(task.start_date, task.due_date);
   const overdue = isOverdue(task.due_date, task.status);
   const effectiveStatus = optimisticStatus ?? task.status;
   const isCompleted = effectiveStatus === "completed";
@@ -131,13 +117,17 @@ function TaskRow({
     setSaving(true);
 
     // Save dates
-    await updateTaskDates(
+    const dateResult = await updateTaskDates(
       task.id,
       episodeId,
       workflowId,
       localStartDate ? localStartDate.toISOString() : null,
       localDueDate ? localDueDate.toISOString() : null
     );
+
+    if (dateResult.cascadeCount && dateResult.cascadeCount > 0) {
+      toast(`Updated dates for ${dateResult.cascadeCount} dependent task${dateResult.cascadeCount > 1 ? "s" : ""}`);
+    }
 
     // Save block responses
     const responsesToSave = Object.entries(blockDraft).map(
@@ -199,15 +189,14 @@ function TaskRow({
             </Badge>
           )}
 
-          {dateRange && (
-            <span
-              className={`text-xs tabular-nums ${
-                overdue ? "text-destructive font-medium" : "text-muted-foreground"
-              }`}
-            >
-              {dateRange}
-            </span>
-          )}
+          <ClientDateRange
+            startDate={task.start_date}
+            dueDate={task.due_date}
+            dateOnly
+            className={`text-xs tabular-nums ${
+              overdue ? "text-destructive font-medium" : "text-muted-foreground"
+            }`}
+          />
 
           <Badge
             variant={
@@ -247,47 +236,19 @@ function TaskRow({
             <div className="grid gap-4 sm:grid-cols-2 pt-3">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      {localStartDate
-                        ? format(localStartDate, "MMM d, yyyy")
-                        : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={localStartDate}
-                      onSelect={setLocalStartDate}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={localStartDate}
+                  onChange={setLocalStartDate}
+                  placeholder="Pick start date & time"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Due Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      {localDueDate
-                        ? format(localDueDate, "MMM d, yyyy")
-                        : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={localDueDate}
-                      onSelect={setLocalDueDate}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={localDueDate}
+                  onChange={setLocalDueDate}
+                  placeholder="Pick due date & time"
+                />
               </div>
             </div>
 

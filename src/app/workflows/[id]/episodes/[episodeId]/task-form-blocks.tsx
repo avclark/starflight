@@ -1,17 +1,10 @@
 "use client";
 
-import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateTimePicker } from "@/components/date-time-picker";
 import { MentionTextarea } from "@/components/mention-textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -248,22 +241,12 @@ function BlockRenderer({
     case "date_time": {
       const dateValue = value ? new Date(value as string) : undefined;
       return (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 max-w-md">
           <RequiredLabel label={labelText} required={required} />
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="max-w-md w-full justify-start text-left font-normal">
-                {dateValue ? format(dateValue, "MMM d, yyyy") : "Pick a date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={dateValue}
-                onSelect={(d) => onChange(d ? d.toISOString() : null)}
-              />
-            </PopoverContent>
-          </Popover>
+          <DateTimePicker
+            value={dateValue}
+            onChange={(d) => onChange(d ? d.toISOString() : null)}
+          />
         </div>
       );
     }

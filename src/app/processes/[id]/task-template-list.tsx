@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { InlineEdit } from "@/components/inline-edit";
 import { ContentSection } from "./content-section";
+import { DatesSection } from "./dates-section";
 import {
   createTaskTemplate,
   deleteTaskTemplate,
@@ -64,6 +65,7 @@ type SettingDef = { id: string; label: string };
 type VisRule = Tables<"task_template_visibility_rules">;
 type Dep = Tables<"task_template_dependencies">;
 type Block = Tables<"task_template_blocks">;
+type DateRuleRow = Tables<"task_template_date_rules">;
 
 // ─── Assignment Section ──────────────────────────────────────
 function AssignmentSection({
@@ -419,6 +421,7 @@ export function TaskTemplateList({
   visibilityRules,
   dependencies,
   blocks,
+  dateRules,
 }: {
   processId: string;
   templates: Tables<"task_templates">[];
@@ -428,6 +431,7 @@ export function TaskTemplateList({
   visibilityRules: VisRule[];
   dependencies: Dep[];
   blocks: Block[];
+  dateRules: DateRuleRow[];
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<"task_templates"> | null>(null);
@@ -655,7 +659,12 @@ export function TaskTemplateList({
                           />
                         </TabsContent>
                         <TabsContent value="dates" className="mt-3">
-                          <p className="text-xs text-muted-foreground">Date rules coming in Phase 6.</p>
+                          <DatesSection
+                            taskTemplateId={t.id}
+                            processId={processId}
+                            existingRules={dateRules.filter((r) => r.task_template_id === t.id)}
+                            allTemplates={templates}
+                          />
                         </TabsContent>
                         <TabsContent value="actions" className="mt-3">
                           <p className="text-xs text-muted-foreground">Completion actions coming in Phase 7.</p>
