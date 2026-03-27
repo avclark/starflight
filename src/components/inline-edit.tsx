@@ -39,7 +39,8 @@ export function InlineEdit({
           variant="ghost"
           size="icon-sm"
           className="opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             setDraft(value);
             setEditing(true);
           }}
@@ -51,7 +52,7 @@ export function InlineEdit({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
       <Input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

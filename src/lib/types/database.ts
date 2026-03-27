@@ -275,7 +275,7 @@ export interface Database {
             | "file_attachment"
             | "date_time"
             | "heading"
-            | "todo_list";
+            | "comments";
           label: string;
           required: boolean;
           options_json: Json | null;
@@ -294,7 +294,7 @@ export interface Database {
             | "file_attachment"
             | "date_time"
             | "heading"
-            | "todo_list";
+            | "comments";
           label: string;
           required?: boolean;
           options_json?: Json | null;
@@ -313,7 +313,7 @@ export interface Database {
             | "file_attachment"
             | "date_time"
             | "heading"
-            | "todo_list";
+            | "comments";
           label?: string;
           required?: boolean;
           options_json?: Json | null;

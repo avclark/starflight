@@ -1,7 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowDownToLine,
+  ArrowUp,
+  ArrowUpToLine,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,9 +37,20 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { InlineEdit } from "@/components/inline-edit";
+import { ContentSection } from "./content-section";
+import {
   createTaskTemplate,
   deleteTaskTemplate,
   updateTaskTemplateAssignment,
+  insertTaskTemplateAt,
+  duplicateTaskTemplate,
+  moveTaskTemplate,
 } from "@/lib/actions/processes";
 import {
   saveVisibilityRules,
@@ -40,6 +63,7 @@ type Person = { id: string; full_name: string };
 type SettingDef = { id: string; label: string };
 type VisRule = Tables<"task_template_visibility_rules">;
 type Dep = Tables<"task_template_dependencies">;
+type Block = Tables<"task_template_blocks">;
 
 // ─── Assignment Section ──────────────────────────────────────
 function AssignmentSection({
@@ -394,6 +418,7 @@ export function TaskTemplateList({
   settingDefinitions,
   visibilityRules,
   dependencies,
+  blocks,
 }: {
   processId: string;
   templates: Tables<"task_templates">[];
@@ -402,6 +427,7 @@ export function TaskTemplateList({
   settingDefinitions: SettingDef[];
   visibilityRules: VisRule[];
   dependencies: Dep[];
+  blocks: Block[];
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<"task_templates"> | null>(null);
@@ -419,6 +445,10 @@ export function TaskTemplateList({
     const title = formData.get("title") as string;
     const result = await createTaskTemplate(processId, title);
     if (result.success) setAddOpen(false);
+  }
+
+  async function handleInsertAt(position: number) {
+    await insertTaskTemplateAt(processId, "New Task", position);
   }
 
   async function handleDelete() {
@@ -460,79 +490,180 @@ export function TaskTemplateList({
           No task templates yet. Add one to define steps in this process.
         </p>
       ) : (
-        <div className="rounded-md border divide-y">
+        <div className="space-y-0">
           {templates.map((t, i) => {
             const isExpanded = expanded.has(t.id);
             const label = assignmentLabel(t, roles, people);
             const ruleCount = visibilityRules.filter((r) => r.task_template_id === t.id).length;
             const depCount = dependencies.filter((d) => d.task_template_id === t.id).length;
+            const blockCount = blocks.filter((b) => b.task_template_id === t.id).length;
 
             return (
               <div key={t.id}>
-                <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/50"
-                  onClick={() => toggleExpanded(t.id)}
-                >
-                  <div className="text-muted-foreground">
-                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </div>
-                  <span className="text-xs text-muted-foreground tabular-nums w-6 text-right">
-                    {i + 1}.
-                  </span>
-                  <span className="flex-1 text-sm">{t.title}</span>
-                  {label && (
-                    <Badge variant="secondary" className="text-xs">
-                      {t.assignment_mode === "role" ? `Role: ${label}` : label}
-                    </Badge>
-                  )}
-                  {ruleCount > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      {ruleCount} rule{ruleCount > 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                  {depCount > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      {depCount} dep{depCount > 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(t); }}
-                  >
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </div>
-                {isExpanded && (
-                  <div className="px-4 pb-4 ml-14 border-t bg-muted/30 pt-3">
-                    <Tabs defaultValue="assignment">
-                      <TabsList className="h-8">
-                        <TabsTrigger value="assignment" className="text-xs">Assignment</TabsTrigger>
-                        <TabsTrigger value="visibility" className="text-xs">Visibility</TabsTrigger>
-                        <TabsTrigger value="dependencies" className="text-xs">Dependencies</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="assignment" className="mt-3">
-                        <AssignmentSection template={t} processId={processId} roles={roles} people={people} />
-                      </TabsContent>
-                      <TabsContent value="visibility" className="mt-3">
-                        <VisibilitySection
-                          template={t}
-                          processId={processId}
-                          settingDefinitions={settingDefinitions}
-                          existingRules={visibilityRules.filter((r) => r.task_template_id === t.id)}
-                        />
-                      </TabsContent>
-                      <TabsContent value="dependencies" className="mt-3">
-                        <DependenciesSection
-                          template={t}
-                          processId={processId}
-                          allTemplates={templates}
-                          existingDeps={dependencies.filter((d) => d.task_template_id === t.id)}
-                        />
-                      </TabsContent>
-                    </Tabs>
+                {/* Insert button between cards */}
+                {i > 0 && (
+                  <div className="flex items-center justify-center py-1">
+                    <div className="h-4 w-px bg-border" />
                   </div>
                 )}
+                {i > 0 && (
+                  <div className="flex items-center justify-center -my-1 relative z-10">
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="h-6 w-6 rounded-full bg-background"
+                      onClick={() => handleInsertAt(i)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                {i > 0 && (
+                  <div className="flex items-center justify-center py-1">
+                    <div className="h-4 w-px bg-border" />
+                  </div>
+                )}
+
+                {/* Task card */}
+                <div className="rounded-lg border bg-card">
+                  <div
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/50 rounded-t-lg"
+                    onClick={() => toggleExpanded(t.id)}
+                  >
+                    <div className="text-muted-foreground">
+                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </div>
+                    <span className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <InlineEdit
+                        value={t.title}
+                        onSave={async (newTitle) => {
+                          const { renameTaskTemplate } = await import("@/lib/actions/processes");
+                          await renameTaskTemplate(t.id, processId, newTitle);
+                        }}
+                        className="text-sm font-medium"
+                      />
+                    </div>
+                    {label && (
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {t.assignment_mode === "role" ? `Role: ${label}` : label}
+                      </Badge>
+                    )}
+                    {blockCount > 0 && (
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {blockCount} block{blockCount > 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                    {ruleCount > 0 && (
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {ruleCount} rule{ruleCount > 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                    {depCount > 0 && (
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {depCount} dep{depCount > 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => duplicateTaskTemplate(t.id, processId)}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={i === 0}
+                            onClick={() => moveTaskTemplate(t.id, processId, "up")}
+                          >
+                            <ArrowUp className="mr-2 h-4 w-4" />
+                            Move Up
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={i === templates.length - 1}
+                            onClick={() => moveTaskTemplate(t.id, processId, "down")}
+                          >
+                            <ArrowDown className="mr-2 h-4 w-4" />
+                            Move Down
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={i === 0}
+                            onClick={() => moveTaskTemplate(t.id, processId, "top")}
+                          >
+                            <ArrowUpToLine className="mr-2 h-4 w-4" />
+                            Move to Top
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={i === templates.length - 1}
+                            onClick={() => moveTaskTemplate(t.id, processId, "bottom")}
+                          >
+                            <ArrowDownToLine className="mr-2 h-4 w-4" />
+                            Move to Bottom
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setDeleteTarget(t)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  {isExpanded && (
+                    <div className="px-4 pb-4 border-t bg-muted/30 pt-3 rounded-b-lg">
+                      <Tabs defaultValue="content">
+                        <TabsList className="h-8">
+                          <TabsTrigger value="content" className="text-xs">Content</TabsTrigger>
+                          <TabsTrigger value="assignment" className="text-xs">Assignment</TabsTrigger>
+                          <TabsTrigger value="visibility" className="text-xs">Visibility</TabsTrigger>
+                          <TabsTrigger value="dependencies" className="text-xs">Dependencies</TabsTrigger>
+                          <TabsTrigger value="dates" className="text-xs">Dates</TabsTrigger>
+                          <TabsTrigger value="actions" className="text-xs">Actions</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="content" className="mt-3">
+                          <ContentSection
+                            taskTemplateId={t.id}
+                            processId={processId}
+                            existingBlocks={blocks.filter((b) => b.task_template_id === t.id)}
+                          />
+                        </TabsContent>
+                        <TabsContent value="assignment" className="mt-3">
+                          <AssignmentSection template={t} processId={processId} roles={roles} people={people} />
+                        </TabsContent>
+                        <TabsContent value="visibility" className="mt-3">
+                          <VisibilitySection
+                            template={t}
+                            processId={processId}
+                            settingDefinitions={settingDefinitions}
+                            existingRules={visibilityRules.filter((r) => r.task_template_id === t.id)}
+                          />
+                        </TabsContent>
+                        <TabsContent value="dependencies" className="mt-3">
+                          <DependenciesSection
+                            template={t}
+                            processId={processId}
+                            allTemplates={templates}
+                            existingDeps={dependencies.filter((d) => d.task_template_id === t.id)}
+                          />
+                        </TabsContent>
+                        <TabsContent value="dates" className="mt-3">
+                          <p className="text-xs text-muted-foreground">Date rules coming in Phase 6.</p>
+                        </TabsContent>
+                        <TabsContent value="actions" className="mt-3">
+                          <p className="text-xs text-muted-foreground">Completion actions coming in Phase 7.</p>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}

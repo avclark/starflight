@@ -35,7 +35,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
+import { TaskFormBlocks, validateRequiredBlocks } from "./task-form-blocks";
+import { TaskComments } from "./task-comments";
 import {
   completeTask,
   uncompleteTask,
@@ -43,9 +46,14 @@ import {
   deleteTask,
   renameEpisode,
 } from "@/lib/actions/episodes";
-import type { Tables } from "@/lib/types/database";
+import { saveTaskBlockResponses } from "@/lib/actions/blocks";
+import type { Tables, Json } from "@/lib/types/database";
 
 type Task = Tables<"tasks">;
+type Block = Tables<"task_template_blocks">;
+type BlockResponse = Tables<"task_block_responses">;
+type Comment = Tables<"task_comments">;
+type Person = { id: string; full_name: string };
 
 function formatDateRange(startDate: string | null, dueDate: string | null) {
   if (!startDate && !dueDate) return null;
@@ -66,37 +74,63 @@ function TaskRow({
   workflowId,
   episodeId,
   assignedName,
+  blocks,
+  responses,
+  comments,
+  userMap,
+  people,
 }: {
   task: Task;
   workflowId: string;
   episodeId: string;
   assignedName?: string;
+  blocks: Block[];
+  responses: BlockResponse[];
+  comments: Comment[];
+  userMap: Record<string, string>;
+  people: Person[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [localStartDate, setLocalStartDate] = useState<Date | undefined>(
     task.start_date ? new Date(task.start_date) : undefined
   );
   const [localDueDate, setLocalDueDate] = useState<Date | undefined>(
     task.due_date ? new Date(task.due_date) : undefined
   );
+  const [blockDraft, setBlockDraft] = useState<Record<string, Json | null>>({});
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
 
   const dateRange = formatDateRange(task.start_date, task.due_date);
   const overdue = isOverdue(task.due_date, task.status);
-  const isCompleted = task.status === "completed";
-  const isBlocked = task.status === "blocked";
+  const effectiveStatus = optimisticStatus ?? task.status;
+  const isCompleted = effectiveStatus === "completed";
+  const isBlocked = effectiveStatus === "blocked";
 
-  async function handleToggleComplete() {
+  async function handleToggleCompleteWithValidation() {
     if (isCompleted) {
-      await uncompleteTask(task.id, episodeId, workflowId);
-    } else {
-      await completeTask(task.id, episodeId, workflowId);
+      setOptimisticStatus("open");
+      uncompleteTask(task.id, episodeId, workflowId);
+      return;
     }
+    // Validate required fields before completing
+    const errors = validateRequiredBlocks(blocks, blockDraft, responses);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors([]);
+    setOptimisticStatus("completed");
+    completeTask(task.id, episodeId, workflowId);
   }
 
-  async function handleSaveDates() {
+  async function handleSave() {
+    setValidationErrors([]);
     setSaving(true);
+
+    // Save dates
     await updateTaskDates(
       task.id,
       episodeId,
@@ -104,6 +138,18 @@ function TaskRow({
       localStartDate ? localStartDate.toISOString() : null,
       localDueDate ? localDueDate.toISOString() : null
     );
+
+    // Save block responses
+    const responsesToSave = Object.entries(blockDraft).map(
+      ([blockId, value]) => ({
+        task_template_block_id: blockId,
+        value_json: value,
+      })
+    );
+    if (responsesToSave.length > 0) {
+      await saveTaskBlockResponses(task.id, episodeId, workflowId, responsesToSave);
+    }
+
     setSaving(false);
   }
 
@@ -122,7 +168,7 @@ function TaskRow({
           <div onClick={(e) => e.stopPropagation()}>
             <Checkbox
               checked={isCompleted}
-              onCheckedChange={handleToggleComplete}
+              onCheckedChange={handleToggleCompleteWithValidation}
               disabled={isBlocked}
             />
           </div>
@@ -245,25 +291,56 @@ function TaskRow({
               </div>
             </div>
 
-            <div className="text-sm text-muted-foreground">
-              Form blocks and comments will appear here in a future phase.
-            </div>
+            {blocks.length > 0 && (
+              <>
+                <Separator />
+                <TaskFormBlocks
+                  blocks={blocks}
+                  responses={responses}
+                  draft={blockDraft}
+                  onUpdate={(blockId, value) =>
+                    setBlockDraft((prev) => ({ ...prev, [blockId]: value }))
+                  }
+                  people={people}
+                />
+              </>
+            )}
+
+            {validationErrors.length > 0 && (
+              <p className="text-sm text-destructive">
+                Required fields missing: {validationErrors.join(", ")}
+              </p>
+            )}
 
             <div className="flex items-center gap-2">
-              <Button onClick={handleSaveDates} disabled={saving} size="sm">
+              <Button onClick={handleSave} disabled={saving} size="sm">
                 {saving ? "Saving..." : "Update Task"}
               </Button>
               {!isCompleted && (
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={handleToggleComplete}
+                  onClick={handleToggleCompleteWithValidation}
                 >
                   <Check className="mr-2 h-4 w-4" />
                   Mark Complete
                 </Button>
               )}
             </div>
+
+            {blocks.some((b) => b.block_type === "comments") && (
+              <>
+                <Separator />
+                <TaskComments
+                  taskId={task.id}
+                  episodeId={episodeId}
+                  workflowId={workflowId}
+                  comments={comments}
+                  userMap={userMap}
+                  people={people}
+                />
+              </>
+            )}
           </div>
         )}
       </div>
@@ -296,6 +373,10 @@ export function EpisodeDetail({
   episode,
   tasks,
   userMap = {},
+  templateBlocks = [],
+  blockResponses = [],
+  comments = [],
+  people = [],
 }: {
   workflowId: string;
   episode: {
@@ -307,6 +388,10 @@ export function EpisodeDetail({
   };
   tasks: Task[];
   userMap?: Record<string, string>;
+  templateBlocks?: Block[];
+  blockResponses?: BlockResponse[];
+  comments?: Comment[];
+  people?: Person[];
 }) {
   return (
     <div className="space-y-6">
@@ -366,6 +451,15 @@ export function EpisodeDetail({
                   ? userMap[task.assigned_user_id]
                   : undefined
               }
+              blocks={templateBlocks.filter(
+                (b) => b.task_template_id === task.task_template_id
+              )}
+              responses={blockResponses.filter(
+                (r) => r.task_id === task.id
+              )}
+              comments={comments.filter((c) => c.task_id === task.id)}
+              userMap={userMap}
+              people={people}
             />
           ))
         )}

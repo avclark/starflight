@@ -48,6 +48,11 @@ export default async function ProcessDetailPage({
     .from("task_template_dependencies")
     .select("*");
 
+  const { data: blocks } = await supabase
+    .from("task_template_blocks")
+    .select("*")
+    .order("display_order");
+
   return (
     <div className="space-y-6">
       <ProcessHeader processId={id} name={processData.name} />
@@ -59,6 +64,7 @@ export default async function ProcessDetailPage({
         settingDefinitions={settingDefinitions ?? []}
         visibilityRules={visibilityRules ?? []}
         dependencies={dependencies ?? []}
+        blocks={blocks ?? []}
       />
     </div>
   );

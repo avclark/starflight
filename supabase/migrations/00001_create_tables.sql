@@ -129,7 +129,7 @@ create table task_template_blocks (
   task_template_id uuid not null references task_templates (id) on delete cascade,
   block_type text not null check (block_type in (
     'description', 'text_input', 'rich_text', 'dropdown', 'radio',
-    'checkbox', 'file_attachment', 'date_time', 'heading', 'todo_list'
+    'checkbox', 'file_attachment', 'date_time', 'heading', 'comments'
   )),
   label text not null,
   required boolean not null default false,

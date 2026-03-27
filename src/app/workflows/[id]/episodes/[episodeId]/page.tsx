@@ -49,6 +49,59 @@ export default async function EpisodeDetailPage({
     (assignedUsers ?? []).map((u) => [u.id, u.full_name])
   );
 
+  // Fetch template blocks for all task templates referenced by these tasks
+  const templateIds = [
+    ...new Set((tasks ?? []).map((t) => t.task_template_id)),
+  ];
+  const { data: templateBlocks } = templateIds.length
+    ? await supabase
+        .from("task_template_blocks")
+        .select("*")
+        .in("task_template_id", templateIds)
+        .order("display_order")
+    : { data: [] };
+
+  // Fetch existing block responses for all tasks
+  const taskIds = (tasks ?? []).map((t) => t.id);
+  const { data: blockResponses } = taskIds.length
+    ? await supabase
+        .from("task_block_responses")
+        .select("*")
+        .in("task_id", taskIds)
+    : { data: [] };
+
+  // Fetch comments for all tasks
+  const { data: comments } = taskIds.length
+    ? await supabase
+        .from("task_comments")
+        .select("*")
+        .in("task_id", taskIds)
+        .order("created_at")
+    : { data: [] };
+
+  // Fetch all comment author names + all people for @mentions
+  const commentUserIds = [
+    ...new Set((comments ?? []).map((c) => c.user_id)),
+  ];
+  const allUserIds = [
+    ...new Set([...assignedUserIds, ...commentUserIds]),
+  ];
+  const { data: allUsers } = allUserIds.length
+    ? await supabase
+        .from("users")
+        .select("id, full_name")
+        .in("id", allUserIds)
+    : { data: [] };
+  const fullUserMap = Object.fromEntries(
+    (allUsers ?? []).map((u) => [u.id, u.full_name])
+  );
+
+  // People for @mention dropdown
+  const { data: allPeople } = await supabase
+    .from("users")
+    .select("id, full_name")
+    .order("full_name");
+
   return (
     <EpisodeDetail
       workflowId={workflowId}
@@ -60,7 +113,11 @@ export default async function EpisodeDetailPage({
         show_name: show?.name ?? null,
       }}
       tasks={tasks ?? []}
-      userMap={userMap}
+      userMap={fullUserMap}
+      templateBlocks={templateBlocks ?? []}
+      blockResponses={blockResponses ?? []}
+      comments={comments ?? []}
+      people={allPeople ?? []}
     />
   );
 }
