@@ -679,6 +679,9 @@ export function TaskTemplateList({
                             processId={processId}
                             existingActions={completionActions.filter((a) => a.task_template_id === t.id)}
                             existingEmailTemplate={emailTemplates.find((e) => e.task_template_id === t.id) ?? null}
+                            settingDefinitions={settingDefinitions}
+                            allTemplates={templates}
+                            allBlocks={blocks}
                           />
                         </TabsContent>
                       </Tabs>

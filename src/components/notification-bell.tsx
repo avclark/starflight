@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { useState, useEffect, useCallback } from "react";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ClientDate } from "@/components/client-date";
 import { createClient } from "@/lib/supabase/client";
 import { markNotificationsRead } from "@/lib/actions/actions";
 
@@ -27,36 +27,35 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  async function loadNotifications() {
+  const loadUnread = useCallback(async () => {
     const supabase = createClient();
+    // TODO: Filter by current authenticated user_id when auth is added
     const { data } = await supabase
       .from("notifications")
       .select("*")
+      .eq("read", false)
       .order("created_at", { ascending: false })
       .limit(20);
     setNotifications((data as Notification[]) ?? []);
-  }
+  }, []);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  useEffect(() => {
+    loadUnread();
+    // Poll every 10 seconds for new notifications
+    const interval = setInterval(loadUnread, 10000);
+    return () => clearInterval(interval);
+  }, [loadUnread]);
 
   async function handleOpen(isOpen: boolean) {
     setOpen(isOpen);
-    if (isOpen) {
-      await loadNotifications();
-    }
+    if (isOpen) await loadUnread();
   }
 
   async function handleMarkAllRead() {
-    const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-    await markNotificationsRead(unreadIds);
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, read: true }))
-    );
+    const ids = notifications.map((n) => n.id);
+    if (ids.length === 0) return;
+    await markNotificationsRead(ids);
+    setNotifications([]);
   }
 
   return (
@@ -64,9 +63,9 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon-sm" className="relative">
           <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
+          {notifications.length > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-              {unreadCount > 9 ? "9+" : unreadCount}
+              {notifications.length > 9 ? "9+" : notifications.length}
             </span>
           )}
         </Button>
@@ -74,7 +73,7 @@ export function NotificationBell() {
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-medium">Notifications</span>
-          {unreadCount > 0 && (
+          {notifications.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
@@ -88,15 +87,13 @@ export function NotificationBell() {
         <div className="max-h-72 overflow-auto">
           {notifications.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground text-center">
-              No notifications
+              No unread notifications
             </p>
           ) : (
             notifications.map((n) => (
               <div
                 key={n.id}
-                className={`border-b last:border-b-0 px-3 py-2 ${
-                  n.read ? "" : "bg-accent/30"
-                }`}
+                className="border-b last:border-b-0 px-3 py-2 bg-accent/30"
               >
                 {n.link ? (
                   <Link
@@ -114,12 +111,23 @@ export function NotificationBell() {
                     {n.body}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {format(new Date(n.created_at), "MMM d, h:mm a")}
-                </p>
+                <ClientDate
+                  date={n.created_at}
+                  fmt="MMM d, h:mm a"
+                  className="text-xs text-muted-foreground mt-0.5 block"
+                />
               </div>
             ))
           )}
+        </div>
+        <div className="border-t px-3 py-2">
+          <Link
+            href="/notifications"
+            className="text-xs text-muted-foreground hover:underline"
+            onClick={() => setOpen(false)}
+          >
+            View all notifications
+          </Link>
         </div>
       </PopoverContent>
     </Popover>

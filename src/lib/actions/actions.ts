@@ -93,6 +93,16 @@ export async function markNotificationsRead(notificationIds: string[]) {
     .from("notifications")
     .update({ read: true })
     .in("id", notificationIds);
-  revalidatePath("/");
+  revalidatePath("/notifications");
+  return { success: true };
+}
+
+export async function markNotificationUnread(notificationId: string) {
+  const supabase = await createClient();
+  await supabase
+    .from("notifications")
+    .update({ read: false })
+    .eq("id", notificationId);
+  revalidatePath("/notifications");
   return { success: true };
 }

@@ -24,6 +24,7 @@ type DraftBlock = {
   label: string;
   required: boolean;
   options_json: Json | null;
+  token_name: string | null;
 };
 
 const BLOCK_TYPES = [
@@ -129,6 +130,7 @@ export function ContentSection({
         label: b.label,
         required: b.required,
         options_json: b.options_json,
+        token_name: b.token_name,
       }))
   );
   const [saving, setSaving] = useState(false);
@@ -144,6 +146,7 @@ export function ContentSection({
         label: "",
         required: false,
         options_json: NEEDS_OPTIONS.has(type) ? [] : null,
+        token_name: null,
       },
     ]);
     setAddType(null);
@@ -163,7 +166,7 @@ export function ContentSection({
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.key === key);
       if (idx === -1) return prev;
-      const copy = { ...prev[idx], key: crypto.randomUUID(), label: `${prev[idx].label} (copy)` };
+      const copy = { ...prev[idx], key: crypto.randomUUID(), label: `${prev[idx].label} (copy)`, token_name: null };
       const next = [...prev];
       next.splice(idx + 1, 0, copy);
       return next;
@@ -194,6 +197,7 @@ export function ContentSection({
         required: b.required,
         options_json: b.options_json,
         display_order: i,
+        token_name: b.token_name || null,
       }))
     );
     if (result.error) setSaveError(result.error);
@@ -270,16 +274,29 @@ export function ContentSection({
             />
 
             {block.block_type !== "heading" &&
-              block.block_type !== "description" && (
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                  <Checkbox
-                    checked={block.required}
-                    onCheckedChange={(checked) =>
-                      updateBlock(block.key, { required: !!checked })
+              block.block_type !== "description" &&
+              block.block_type !== "comments" && (
+                <>
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                    <Checkbox
+                      checked={block.required}
+                      onCheckedChange={(checked) =>
+                        updateBlock(block.key, { required: !!checked })
+                      }
+                    />
+                    Required
+                  </label>
+                  <Input
+                    value={block.token_name ?? ""}
+                    onChange={(e) =>
+                      updateBlock(block.key, {
+                        token_name: e.target.value || null,
+                      })
                     }
+                    placeholder="Token name (optional, e.g. client_notes)"
+                    className="h-7 text-xs max-w-xs"
                   />
-                  Required
-                </label>
+                </>
               )}
 
             {NEEDS_OPTIONS.has(block.block_type) && (

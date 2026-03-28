@@ -16,6 +16,7 @@ export async function saveBlocks(
     required: boolean;
     options_json: Json | null;
     display_order: number;
+    token_name?: string | null;
   }[]
 ) {
   const supabase = await createClient();
@@ -28,6 +29,7 @@ export async function saveBlocks(
     required: b.required,
     options_json: b.options_json,
     display_order: b.display_order,
+    token_name: b.token_name ?? null,
   }));
 
   // Delete existing blocks
@@ -74,6 +76,23 @@ export async function saveTaskBlockResponses(
     );
   }
 
+  revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
+  return { success: true };
+}
+
+export async function saveEmailBodyOverride(
+  taskId: string,
+  episodeId: string,
+  workflowId: string,
+  emailBodyOverride: string | null
+) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .update({ email_body_override: emailBodyOverride })
+    .eq("id", taskId);
+
+  if (error) return { error: error.message };
   revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
   return { success: true };
 }

@@ -30,23 +30,26 @@ const ACTION_TYPES = [
   { value: "send_email", label: "Send Email" },
 ];
 
-const TOKEN_HELP = [
-  "{{episode.title}}",
-  "{{show.name}}",
-  "{{show.setting.SETTING_LABEL}}",
-  "{{task.response.BLOCK_LABEL}}",
-];
+type SettingDef = { id: string; label: string };
+type TaskTpl = { id: string; title: string };
+type BlockTpl = { task_template_id: string; label: string; token_name: string | null; block_type: string };
 
 export function ActionsSection({
   taskTemplateId,
   processId,
   existingActions,
   existingEmailTemplate,
+  settingDefinitions = [],
+  allTemplates = [],
+  allBlocks = [],
 }: {
   taskTemplateId: string;
   processId: string;
   existingActions: Action[];
   existingEmailTemplate: EmailTemplate | null;
+  settingDefinitions?: SettingDef[];
+  allTemplates?: TaskTpl[];
+  allBlocks?: BlockTpl[];
 }) {
   const [actions, setActions] = useState(
     existingActions.map((a) => ({
@@ -219,15 +222,32 @@ export function ActionsSection({
               Auto-send when task is marked complete
             </label>
 
-            <div className="rounded border p-2 bg-muted/50 space-y-1">
+            <div className="rounded border p-2 bg-muted/50 space-y-1 max-h-48 overflow-auto">
               <p className="text-xs font-medium text-muted-foreground">
                 Available tokens:
               </p>
-              {TOKEN_HELP.map((t) => (
-                <code key={t} className="block text-xs text-muted-foreground">
-                  {t}
+              <code className="block text-xs text-muted-foreground">{"{{episode.title}}"}</code>
+              <code className="block text-xs text-muted-foreground">{"{{show.name}}"}</code>
+              {settingDefinitions.map((sd) => (
+                <code key={sd.id} className="block text-xs text-muted-foreground">
+                  {"{{show.setting." + sd.label + "}}"}
                 </code>
               ))}
+              {allBlocks
+                .filter((b) => b.block_type !== "heading" && b.block_type !== "description" && b.block_type !== "comments")
+                .map((b) => {
+                  const tpl = allTemplates.find((t) => t.id === b.task_template_id);
+                  const token = b.token_name
+                    ? `{{${b.token_name}}}`
+                    : tpl
+                    ? `{{${tpl.title}.${b.label}}}`
+                    : `{{${b.label}}}`;
+                  return (
+                    <code key={b.task_template_id + b.label} className="block text-xs text-muted-foreground">
+                      {token}
+                    </code>
+                  );
+                })}
             </div>
           </div>
         </>

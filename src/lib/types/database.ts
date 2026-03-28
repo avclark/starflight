@@ -280,6 +280,7 @@ export interface Database {
           required: boolean;
           options_json: Json | null;
           display_order: number;
+          token_name: string | null;
         };
         Insert: {
           id?: string;
@@ -299,6 +300,7 @@ export interface Database {
           required?: boolean;
           options_json?: Json | null;
           display_order?: number;
+          token_name?: string | null;
         };
         Update: {
           id?: string;
@@ -318,6 +320,7 @@ export interface Database {
           required?: boolean;
           options_json?: Json | null;
           display_order?: number;
+          token_name?: string | null;
         };
         Relationships: [];
       };
@@ -530,6 +533,7 @@ export interface Database {
           due_date: string | null;
           completed_at: string | null;
           completed_by: string | null;
+          email_body_override: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -546,6 +550,7 @@ export interface Database {
           due_date?: string | null;
           completed_at?: string | null;
           completed_by?: string | null;
+          email_body_override?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -562,6 +567,7 @@ export interface Database {
           due_date?: string | null;
           completed_at?: string | null;
           completed_by?: string | null;
+          email_body_override?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -1,18 +1,57 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardTasks } from "./dashboard-tasks";
+import { UserSwitcher } from "./user-switcher";
 import Link from "next/link";
 import { ClientDate } from "@/components/client-date";
+import type { Tables } from "@/lib/types/database";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ userId?: string }>;
+}) {
+  const { userId } = await searchParams;
   const supabase = await createClient();
 
-  const { data: episodes } = await supabase
-    .from("episodes")
-    .select("*")
-    .eq("status", "active")
-    .order("updated_at", { ascending: false })
-    .limit(10);
+  // Fetch all people for the switcher
+  const { data: people } = await supabase
+    .from("users")
+    .select("id, full_name")
+    .order("full_name");
+
+  // TODO: Replace userId from searchParams with actual authenticated user when auth is added
+  let episodes: Tables<"episodes">[] = [];
+
+  if (userId) {
+    // Find episodes where this user has at least one task assigned
+    const { data: userTasks } = await supabase
+      .from("tasks")
+      .select("episode_id")
+      .eq("assigned_user_id", userId)
+      .eq("is_visible", true);
+
+    const episodeIds = [...new Set((userTasks ?? []).map((t) => t.episode_id))];
+
+    if (episodeIds.length > 0) {
+      const { data } = await supabase
+        .from("episodes")
+        .select("*")
+        .eq("status", "active")
+        .in("id", episodeIds)
+        .order("updated_at", { ascending: false })
+        .limit(10);
+      episodes = data ?? [];
+    }
+  } else {
+    const { data } = await supabase
+      .from("episodes")
+      .select("*")
+      .eq("status", "active")
+      .order("updated_at", { ascending: false })
+      .limit(10);
+    episodes = data ?? [];
+  }
 
   // Fetch related shows and workflows for display
   const showIds = [...new Set((episodes ?? []).map((e) => e.show_id))];
@@ -28,13 +67,18 @@ export default async function DashboardPage() {
   const showMap = new Map((shows ?? []).map((s) => [s.id, s.name]));
   const workflowMap = new Map((workflows ?? []).map((w) => [w.id, w.name]));
 
-  // TODO: When auth is added, filter by current user's ID:
-  // .eq("assigned_user_id", currentUserId)
-  const { data: tasks } = await supabase
+  // Fetch tasks — filtered by user if set
+  let tasksQuery = supabase
     .from("tasks")
     .select("*")
     .eq("status", "open")
-    .eq("is_visible", true)
+    .eq("is_visible", true);
+
+  if (userId) {
+    tasksQuery = tasksQuery.eq("assigned_user_id", userId);
+  }
+
+  const { data: tasks } = await tasksQuery
     .order("due_date", { ascending: true, nullsFirst: false })
     .limit(20);
 
@@ -52,7 +96,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <UserSwitcher people={people ?? []} />
+      </div>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -61,7 +108,7 @@ export default async function DashboardPage() {
           <CardContent>
             {!episodes || episodes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No active episodes.
+                {userId ? "No active episodes for this user." : "No active episodes."}
               </p>
             ) : (
               <div className="space-y-3">

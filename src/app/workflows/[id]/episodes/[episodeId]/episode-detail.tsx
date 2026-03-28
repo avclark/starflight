@@ -74,6 +74,7 @@ function TaskRow({
   showSettingsMap,
   allBlocks,
   allResponses,
+  allTasks,
 }: {
   task: Task;
   workflowId: string;
@@ -90,6 +91,7 @@ function TaskRow({
   showSettingsMap: Record<string, string>;
   allBlocks: Block[];
   allResponses: BlockResponse[];
+  allTasks: Task[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -313,9 +315,11 @@ function TaskRow({
                   showSettingsMap={showSettingsMap}
                   allBlocks={allBlocks}
                   allResponses={allResponses}
+                  allTasks={allTasks}
                   taskId={task.id}
                   episodeId={episodeId}
                   workflowId={workflowId}
+                  emailBodyOverride={task.email_body_override}
                 />
               </>
             )}
@@ -466,6 +470,7 @@ export function EpisodeDetail({
               showSettingsMap={showSettingsMap}
               allBlocks={templateBlocks}
               allResponses={blockResponses}
+              allTasks={tasks}
             />
           ))
         )}
