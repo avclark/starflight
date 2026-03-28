@@ -12,6 +12,7 @@ import {
 import { ClientDate } from "@/components/client-date";
 import { createClient } from "@/lib/supabase/client";
 import { markNotificationsRead } from "@/lib/actions/actions";
+import { CURRENT_USER_COOKIE } from "@/lib/current-user";
 
 type Notification = {
   id: string;
@@ -23,16 +24,29 @@ type Notification = {
   created_at: string;
 };
 
+function getCurrentUserId(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(
+    new RegExp(`(?:^|; )${CURRENT_USER_COOKIE}=([^;]*)`)
+  );
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
 
   const loadUnread = useCallback(async () => {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      setNotifications([]);
+      return;
+    }
     const supabase = createClient();
-    // TODO: Filter by current authenticated user_id when auth is added
     const { data } = await supabase
       .from("notifications")
       .select("*")
+      .eq("user_id", userId)
       .eq("read", false)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -41,9 +55,17 @@ export function NotificationBell() {
 
   useEffect(() => {
     loadUnread();
-    // Poll every 10 seconds for new notifications
     const interval = setInterval(loadUnread, 10000);
     return () => clearInterval(interval);
+  }, [loadUnread]);
+
+  // Also reload when cookie changes (user switcher)
+  useEffect(() => {
+    function handleCookieChange() {
+      loadUnread();
+    }
+    window.addEventListener("focus", handleCookieChange);
+    return () => window.removeEventListener("focus", handleCookieChange);
   }, [loadUnread]);
 
   async function handleOpen(isOpen: boolean) {

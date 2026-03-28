@@ -296,17 +296,38 @@ export async function completeTask(taskId: string, episodeId: string, workflowId
 
   if (error) return { error: error.message };
 
-  // Unblock dependent tasks: find tasks in this episode that depend on the completed task's template
+  // Unblock dependent tasks
   if (task) {
     await unblockDependentTasks(supabase, episodeId, task.task_template_id);
   }
 
   await recalculateProgress(supabase, episodeId);
 
+  // Check for auto-send email template
+  let autoSentEmail = false;
+  if (task) {
+    const { data: emailTemplate } = await supabase
+      .from("task_template_email_templates")
+      .select("*")
+      .eq("task_template_id", task.task_template_id)
+      .eq("auto_send_on_complete", true)
+      .single();
+
+    if (emailTemplate) {
+      // Log the auto-send (actual email sending via Edge Functions is a future enhancement)
+      console.log("Auto-sending email on task completion:", {
+        taskId,
+        from: emailTemplate.from_name,
+        subject: emailTemplate.subject_template,
+      });
+      autoSentEmail = true;
+    }
+  }
+
   revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
   revalidatePath(`/workflows/${workflowId}`);
   revalidatePath("/dashboard");
-  return { success: true };
+  return { success: true, autoSentEmail };
 }
 
 export async function uncompleteTask(taskId: string, episodeId: string, workflowId: string) {

@@ -1,5 +1,21 @@
-1. Update task names
-2. Update / edit people names and email addresses
-3. Drag and drop tasks
-4. Performance optimization pass — optimistic UI, realtime subscriptions, prefetching, DB indexes
-5. 
+1. I should be able to Update task names inside an episode
+2. I should be able to add content clocks to a task when inside an episode (not just inside the process builder). These updates would of course, just be one-offs. They would not propogate to anything but this one instance of an episode. Basically the tasks rows should function the same inside an episode instance as they do in the process builder. All the same functionality. They should look the same too (but that will probably come in the UI.) Currently in the process builder, it let's me add blocks, but I can't see what it wold look like in an actual episode. In an episode I can see the front end of a block, but can't modify it or add any others. 
+   1. I've attached a couple screenshots of how this functionality should work (not necessarily how it should look). These screenshots are inside PK's process builder, but again, the process builder and an episode instance of that process should look and function the same. The first screenshot is a task with one ToDo block. You can see below there is a text button for a new block. The second screenshot shows what it looks like when I click that button. The third screenshot shows when I select a radio button block. The fourth screenshot shows after I filled in some details and saved that block. The fifth screenshot shows me clicking the three dots to the right of that block and shows the options I should have (namely to edit the block through block settings).
+3. Update / edit people names and email addresses. Currently I can only add new people or delete existing people. But each person should have a profile page 
+4. Tasks should be drag and droppable. I should be able to rearrange tasks by dragging and dropping. Again, since the process builder and an episode instance should be the same, I should be able to drag and drop whether I'm in the process builder or in an episode instance. 
+7. I need the ability to duplicate tasks, whether in a specific episode instance, or when creating a process. When I click the + or "+ Add Task" button, it should give me a popup that lets me choose blank task (this would be the default, so if it's a blank task I can just hit enter and create it), or give me to dropdowns. The first dropdown would let me choose the process, and the second dropdown would let me choose the task within that process. If I do that, it would duplicate that tasks (with all of its blocks and settings) into the current process or episode I'm working on. If there is a cleaner way to implement this than two dropdowns, please let me know. 
+8. Let's move the show settings page (where I set all the show's settings) from the main nav in the sidebar and have it live under Shows. So when I click on Shows from the main nav, it takes me to a list of all shows (as it currently does), but then there is another tab called Settings and that's where I can set the various settings. 
+9. For the types of fields that I should be able to add to Settings page, see screenshot 9.
+10. Performance optimization pass — optimistic UI, realtime subscriptions, prefetching, DB indexes
+11. Implement real auth / user accounts
+12. Implement the ability to send emails, slack notifications, etc. 
+13. Regarding email and notification functionality — Whenever a user is assigned to a task (whether automatically through a role assignment, or directly) they should get an email alert and a notification in the notifications section of the app. I would also like for them to receive a slack notification as well, but not sure the best way to implement that. Here is a list of the times a user should be notified/receive an email:
+    1.  When I am assigned to Task(s)
+    2.  When a task that I am assigned to Is Starting
+    3.  When a task that I am assigned to Becomes due
+    4.  When someone mentions me in a Comment
+14. 13 cont. — Each user should be able to set their notification preferences, but they should all be turned on by default. See screenshot 10. For now, users should have a profile page where they can set First Name, Last Name, Email, upload an avatar, and set time zone. And they should have a Notification Settings page which I referenced above. 
+15. User avatars should show up next to their name similar to how logos/artwork shows up next to show names (see screenshot 8)
+16. Full UI pass - this step will affect some of the functionality, so I'm not sure if that functionality should be broken out and built before the design pass or not. For example, each new client/show should have a spot where I can upload a logo. In our case, this would be the show artwork. And that would show up next to the client name in their settings screen (screenshot 6), and whenever the client is list on the shows page (screenshot 7).
+
+That's everything I can think of right now. I'm sure more will come to me as we go through these next phases. What is the best way to break all of this down into new phases to get this app across the finish line?

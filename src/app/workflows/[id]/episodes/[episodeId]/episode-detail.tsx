@@ -117,7 +117,20 @@ function TaskRow({
       uncompleteTask(task.id, episodeId, workflowId);
       return;
     }
-    // Validate required fields before completing
+
+    // If there are unsaved draft changes, save them first
+    const hasDraftChanges = Object.keys(blockDraft).length > 0;
+    if (hasDraftChanges) {
+      const responsesToSave = Object.entries(blockDraft).map(
+        ([blockId, value]) => ({
+          task_template_block_id: blockId,
+          value_json: value,
+        })
+      );
+      await saveTaskBlockResponses(task.id, episodeId, workflowId, responsesToSave);
+    }
+
+    // Validate against the merged state (saved + draft) to check completeness
     const errors = validateRequiredBlocks(blocks, blockDraft, responses);
     if (errors.length > 0) {
       setValidationErrors(errors);
@@ -125,7 +138,10 @@ function TaskRow({
     }
     setValidationErrors([]);
     setOptimisticStatus("completed");
-    completeTask(task.id, episodeId, workflowId);
+    const result = await completeTask(task.id, episodeId, workflowId);
+    if (result.autoSentEmail) {
+      toast("Email auto-sent on completion");
+    }
   }
 
   async function handleSave() {

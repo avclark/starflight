@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CURRENT_USER_COOKIE } from "@/lib/current-user";
 
 type Person = { id: string; full_name: string };
 
@@ -22,8 +23,10 @@ export function UserSwitcher({ people }: { people: Person[] }) {
     const params = new URLSearchParams(searchParams);
     if (userId === "__all__") {
       params.delete("userId");
+      document.cookie = `${CURRENT_USER_COOKIE}=; path=/; max-age=0`;
     } else {
       params.set("userId", userId);
+      document.cookie = `${CURRENT_USER_COOKIE}=${userId}; path=/; max-age=${60 * 60 * 24 * 30}`;
     }
     router.push(`/dashboard?${params.toString()}`);
   }

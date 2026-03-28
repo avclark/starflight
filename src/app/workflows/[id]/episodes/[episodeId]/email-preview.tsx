@@ -16,6 +16,30 @@ type BlockResponse = Tables<"task_block_responses">;
 type Block = Tables<"task_template_blocks">;
 type Task = Tables<"tasks">;
 
+function LinkifiedText({ text }: { text: string }) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        urlRegex.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 function normalize(s: string): string {
   return s.toLowerCase().replace(/_/g, " ").trim();
 }
@@ -206,6 +230,7 @@ export function EmailPreview({
             onChange={(e) => setDraftBody(e.target.value)}
             className="min-h-[100px] text-sm"
           />
+
           <div className="flex gap-2">
             <Button size="sm" onClick={handleSaveEdit} disabled={savingEdit}>
               {savingEdit ? "Saving..." : "Save Changes"}
@@ -223,7 +248,9 @@ export function EmailPreview({
           </div>
         </div>
       ) : (
-        <p className="text-sm whitespace-pre-wrap">{displayBody}</p>
+        <div className="text-sm whitespace-pre-wrap">
+          <LinkifiedText text={displayBody} />
+        </div>
       )}
 
       {!editing && (
