@@ -18,4 +18,6 @@
 15. User avatars should show up next to their name similar to how logos/artwork shows up next to show names (see screenshot 8)
 16. Full UI pass - this step will affect some of the functionality, so I'm not sure if that functionality should be broken out and built before the design pass or not. For example, each new client/show should have a spot where I can upload a logo. In our case, this would be the show artwork. And that would show up next to the client name in their settings screen (screenshot 6), and whenever the client is list on the shows page (screenshot 7).
 
-That's everything I can think of right now. I'm sure more will come to me as we go through these next phases. What is the best way to break all of this down into new phases to get this app across the finish line?
+1. Global search
+2. user avatar next to notifications in top right
+3. 
