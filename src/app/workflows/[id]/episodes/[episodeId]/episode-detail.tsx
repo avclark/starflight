@@ -51,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
 import { SortableList, SortableItem, DragHandle, arrayMove } from "@/components/sortable-list";
+import { InsertTaskButton } from "@/components/insert-task-button";
 import { TaskPicker } from "@/components/task-picker";
 import { duplicateTaskToEpisode } from "@/lib/actions/duplicate-task";
 import { TaskFormBlocks, validateRequiredBlocks } from "./task-form-blocks";
@@ -1079,6 +1080,33 @@ function TaskRow({
   );
 }
 
+function EpisodeEmptyTaskState({
+  onBlankTask,
+  onCopyTask,
+}: {
+  onBlankTask: () => void;
+  onCopyTask: (templateId: string) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <Button size="sm" onClick={onBlankTask}>
+        <Plus className="mr-2 h-4 w-4" />
+        Blank Task
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+        <Copy className="mr-2 h-4 w-4" />
+        Copy from Existing
+      </Button>
+      <TaskPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={(id) => onCopyTask(id)}
+      />
+    </div>
+  );
+}
+
 export function EpisodeDetail({
   workflowId,
   episode,
@@ -1144,7 +1172,6 @@ export function EpisodeDetail({
   });
 
   const [localTaskOrder, setLocalTaskOrder] = useState<string[] | null>(null);
-  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
   const orderedTasks = localTaskOrder
     ? localTaskOrder.map((id) => tasks.find((t) => t.id === id)).filter(Boolean) as Task[]
     : tasks;
@@ -1190,30 +1217,22 @@ export function EpisodeDetail({
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setTaskPickerOpen(true)}
-        >
-          <Copy className="mr-2 h-4 w-4" />
-          Copy Task from Existing
-        </Button>
-        <TaskPicker
-          open={taskPickerOpen}
-          onOpenChange={setTaskPickerOpen}
-          onSelect={async (templateId) => {
-            // Use the first task's template_id as FK placeholder
-            const firstTaskTemplateId = tasks[0]?.task_template_id ?? templateId;
-            await duplicateTaskToEpisode(templateId, episode.id, workflowId, firstTaskTemplateId);
-          }}
-        />
-      </div>
-
       <div className="space-y-0">
         {orderedTasks.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8 rounded-md border">
-            No tasks in this episode.
+          <div className="text-center py-8 rounded-md border space-y-3">
+            <p className="text-sm text-muted-foreground">
+              No tasks in this episode.
+            </p>
+            <EpisodeEmptyTaskState
+              onBlankTask={() => {
+                const templateId = tasks[0]?.task_template_id ?? "";
+                if (templateId) insertTaskInEpisode(episode.id, workflowId, "New Task", 0, templateId);
+              }}
+              onCopyTask={async (templateId) => {
+                const fkTemplateId = tasks[0]?.task_template_id ?? templateId;
+                await duplicateTaskToEpisode(templateId, episode.id, workflowId, fkTemplateId, 0);
+              }}
+            />
           </div>
         ) : (
           <SortableList
@@ -1235,11 +1254,9 @@ export function EpisodeDetail({
                     <div className="h-4 w-px bg-border" />
                   </div>
                   <div className="flex items-center justify-center -my-1 relative z-10">
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      className="h-6 w-6 rounded-full bg-background"
-                      onClick={() =>
+                    <InsertTaskButton
+                      size="icon"
+                      onBlankTask={() =>
                         insertTaskInEpisode(
                           episode.id,
                           workflowId,
@@ -1248,9 +1265,16 @@ export function EpisodeDetail({
                           task.task_template_id
                         )
                       }
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                      onCopyTask={async (templateId) => {
+                        await duplicateTaskToEpisode(
+                          templateId,
+                          episode.id,
+                          workflowId,
+                          task.task_template_id,
+                          task.position
+                        );
+                      }}
+                    />
                   </div>
                   <div className="flex items-center justify-center py-1">
                     <div className="h-4 w-px bg-border" />
@@ -1309,6 +1333,33 @@ export function EpisodeDetail({
           </SortableList>
         )}
       </div>
+
+      {orderedTasks.length > 0 && (
+        <div className="flex items-center justify-center py-2">
+          <InsertTaskButton
+            size="icon"
+            onBlankTask={() => {
+              const lastTask = orderedTasks[orderedTasks.length - 1];
+              insertTaskInEpisode(
+                episode.id,
+                workflowId,
+                "New Task",
+                lastTask.position + 1,
+                lastTask.task_template_id
+              );
+            }}
+            onCopyTask={async (templateId) => {
+              const lastTask = orderedTasks[orderedTasks.length - 1];
+              await duplicateTaskToEpisode(
+                templateId,
+                episode.id,
+                workflowId,
+                lastTask.task_template_id
+              );
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

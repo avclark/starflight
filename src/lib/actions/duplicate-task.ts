@@ -27,7 +27,8 @@ export async function getAllTaskTemplatesGrouped() {
 
 export async function duplicateTaskToProcess(
   sourceTemplateId: string,
-  targetProcessId: string
+  targetProcessId: string,
+  atPosition?: number
 ) {
   const supabase = await createClient();
 
@@ -39,23 +40,36 @@ export async function duplicateTaskToProcess(
 
   if (!source) return { error: "Source task not found" };
 
-  // Get next position
-  const { data: existing } = await supabase
-    .from("task_templates")
-    .select("position")
-    .eq("process_id", targetProcessId)
-    .order("position", { ascending: false })
-    .limit(1);
-
-  const nextPos = existing?.[0] ? existing[0].position + 1 : 0;
+  let insertPos: number;
+  if (atPosition !== undefined) {
+    // Shift existing templates at or after this position
+    const { data: toShift } = await supabase
+      .from("task_templates")
+      .select("id, position")
+      .eq("process_id", targetProcessId)
+      .gte("position", atPosition)
+      .order("position", { ascending: false });
+    for (const t of toShift ?? []) {
+      await supabase.from("task_templates").update({ position: t.position + 1 }).eq("id", t.id);
+    }
+    insertPos = atPosition;
+  } else {
+    const { data: existing } = await supabase
+      .from("task_templates")
+      .select("position")
+      .eq("process_id", targetProcessId)
+      .order("position", { ascending: false })
+      .limit(1);
+    insertPos = existing?.[0] ? existing[0].position + 1 : 0;
+  }
 
   // Create the template
   const { data: newTemplate, error } = await supabase
     .from("task_templates")
     .insert({
       process_id: targetProcessId,
-      title: source.title,
-      position: nextPos,
+      title: `${source.title} (copy)`,
+      position: insertPos,
       assignment_mode: source.assignment_mode,
       assigned_role_id: source.assigned_role_id,
       assigned_user_id: source.assigned_user_id,
@@ -132,7 +146,8 @@ export async function duplicateTaskToEpisode(
   sourceTemplateId: string,
   episodeId: string,
   workflowId: string,
-  taskTemplateId: string // Required FK placeholder
+  taskTemplateId: string, // Required FK placeholder
+  atPosition?: number
 ) {
   const supabase = await createClient();
 
@@ -144,15 +159,27 @@ export async function duplicateTaskToEpisode(
 
   if (!source) return { error: "Source task not found" };
 
-  // Get next position
-  const { data: existing } = await supabase
-    .from("tasks")
-    .select("position")
-    .eq("episode_id", episodeId)
-    .order("position", { ascending: false })
-    .limit(1);
-
-  const nextPos = existing?.[0] ? existing[0].position + 1 : 0;
+  let insertPos: number;
+  if (atPosition !== undefined) {
+    const { data: toShift } = await supabase
+      .from("tasks")
+      .select("id, position")
+      .eq("episode_id", episodeId)
+      .gte("position", atPosition)
+      .order("position", { ascending: false });
+    for (const t of toShift ?? []) {
+      await supabase.from("tasks").update({ position: t.position + 1 }).eq("id", t.id);
+    }
+    insertPos = atPosition;
+  } else {
+    const { data: existing } = await supabase
+      .from("tasks")
+      .select("position")
+      .eq("episode_id", episodeId)
+      .order("position", { ascending: false })
+      .limit(1);
+    insertPos = existing?.[0] ? existing[0].position + 1 : 0;
+  }
 
   // Create instance task
   const { data: newTask, error } = await supabase
@@ -160,8 +187,8 @@ export async function duplicateTaskToEpisode(
     .insert({
       episode_id: episodeId,
       task_template_id: taskTemplateId,
-      title: source.title,
-      position: nextPos,
+      title: `${source.title} (copy)`,
+      position: insertPos,
       status: "open",
       is_visible: true,
       assigned_user_id: source.assigned_user_id,

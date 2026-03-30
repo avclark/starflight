@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { InlineEdit } from "@/components/inline-edit";
 import { SortableList, SortableItem, DragHandle, arrayMove } from "@/components/sortable-list";
+import { InsertTaskButton } from "@/components/insert-task-button";
 import { TaskPicker } from "@/components/task-picker";
 import { duplicateTaskToProcess } from "@/lib/actions/duplicate-task";
 import { ActionsSection } from "./actions-section";
@@ -419,6 +420,36 @@ function assignmentLabel(
   return null;
 }
 
+function EmptyTaskState({
+  onBlankTask,
+  onCopyTask,
+}: {
+  onBlankTask: () => void;
+  onCopyTask: (templateId: string) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  return (
+    <div className="text-center py-8 rounded-md border space-y-3">
+      <p className="text-sm text-muted-foreground">No task templates yet.</p>
+      <div className="flex items-center justify-center gap-2">
+        <Button size="sm" onClick={onBlankTask}>
+          <Plus className="mr-2 h-4 w-4" />
+          Blank Task
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+          <Copy className="mr-2 h-4 w-4" />
+          Copy from Existing
+        </Button>
+        <TaskPicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onSelect={(id) => onCopyTask(id)}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function TaskTemplateList({
   processId,
   templates,
@@ -483,53 +514,15 @@ export function TaskTemplateList({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Task Templates</h2>
-        <div className="flex items-center gap-2">
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Blank Task
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Task Template</DialogTitle>
-              </DialogHeader>
-              <form action={handleAdd} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
-                  <Input id="title" name="title" placeholder="Task title" required autoFocus />
-                </div>
-                <div className="flex justify-end">
-                  <Button type="submit">Add</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setPickerOpen(true)}
-          >
-            <Copy className="mr-2 h-4 w-4" />
-            Copy from Existing
-          </Button>
-          <TaskPicker
-            open={pickerOpen}
-            onOpenChange={setPickerOpen}
-            onSelect={async (templateId) => {
-              await duplicateTaskToProcess(templateId, processId);
-            }}
-          />
-        </div>
-      </div>
+      <h2 className="text-lg font-semibold">Task Templates</h2>
 
       {templates.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">
-          No task templates yet. Add one to define steps in this process.
-        </p>
+        <EmptyTaskState
+          onBlankTask={() => handleInsertAt(0)}
+          onCopyTask={async (templateId) => {
+            await duplicateTaskToProcess(templateId, processId, 0);
+          }}
+        />
       ) : (
         <SortableList
           items={orderedTemplates.map((t) => t.id)}
@@ -560,14 +553,13 @@ export function TaskTemplateList({
                 )}
                 {i > 0 && (
                   <div className="flex items-center justify-center -my-1 relative z-10">
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      className="h-6 w-6 rounded-full bg-background"
-                      onClick={() => handleInsertAt(i)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                    <InsertTaskButton
+                      size="icon"
+                      onBlankTask={() => handleInsertAt(i)}
+                      onCopyTask={async (templateId) => {
+                        await duplicateTaskToProcess(templateId, processId, i);
+                      }}
+                    />
                   </div>
                 )}
                 {i > 0 && (
@@ -736,6 +728,18 @@ export function TaskTemplateList({
             );
           })}
         </SortableList>
+      )}
+
+      {templates.length > 0 && (
+        <div className="flex items-center justify-center py-2">
+          <InsertTaskButton
+            size="icon"
+            onBlankTask={() => handleInsertAt(templates.length)}
+            onCopyTask={async (templateId) => {
+              await duplicateTaskToProcess(templateId, processId);
+            }}
+          />
+        </div>
       )}
 
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
