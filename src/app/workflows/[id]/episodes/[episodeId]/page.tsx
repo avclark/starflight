@@ -61,6 +61,22 @@ export default async function EpisodeDetailPage({
         .order("display_order")
     : { data: [] };
 
+  // Fetch date rules for task templates
+  const { data: dateRules } = templateIds.length
+    ? await supabase
+        .from("task_template_date_rules")
+        .select("*")
+        .in("task_template_id", templateIds)
+    : { data: [] };
+
+  // Fetch task templates for date rule display (need titles)
+  const { data: taskTemplatesForRules } = templateIds.length
+    ? await supabase
+        .from("task_templates")
+        .select("id, title")
+        .in("id", templateIds)
+    : { data: [] };
+
   // Fetch instance blocks (episode-level blocks added to tasks)
   const taskIds = (tasks ?? []).map((t) => t.id);
   const { data: instanceBlocks } = taskIds.length
@@ -111,6 +127,24 @@ export default async function EpisodeDetailPage({
     .select("id, full_name")
     .order("full_name");
 
+  // Fetch roles for assignment tab
+  const { data: roles } = await supabase
+    .from("roles")
+    .select("id, name")
+    .order("display_order");
+
+  // Fetch show role assignments for role resolution
+  const { data: showRoleAssignments } = await supabase
+    .from("show_role_assignments")
+    .select("role_id, user_id")
+    .eq("show_id", episode.show_id);
+
+  // Fetch show setting definitions for visibility rules
+  const { data: allSettingDefs } = await supabase
+    .from("show_setting_definitions")
+    .select("id, label")
+    .order("display_order");
+
   // Email templates for tasks with send_email actions
   const { data: emailTemplates } = templateIds.length
     ? await supabase
@@ -160,6 +194,11 @@ export default async function EpisodeDetailPage({
       emailTemplates={emailTemplates ?? []}
       showSettingsMap={showSettingsMap}
       instanceBlocks={instanceBlocks ?? []}
+      roles={roles ?? []}
+      settingDefinitions={allSettingDefs ?? []}
+      showRoleAssignments={showRoleAssignments ?? []}
+      dateRules={dateRules ?? []}
+      taskTemplatesForRules={taskTemplatesForRules ?? []}
     />
   );
 }

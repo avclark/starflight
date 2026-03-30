@@ -300,6 +300,64 @@ export async function duplicateTaskInEpisode(
   return { success: true };
 }
 
+export async function saveTaskInstanceOverrides(
+  taskId: string,
+  episodeId: string,
+  workflowId: string,
+  overrides: {
+    assigned_user_id?: string | null;
+    instance_dependencies?: string[];
+    instance_visibility_rules?: {
+      logic: "and" | "or";
+      rules: {
+        name: string;
+        setting_definition_id: string;
+        operator: string;
+        target_value: string | null;
+        is_active: boolean;
+      }[];
+    } | null;
+    instance_actions?: { key: string; action_type: string }[];
+    instance_email_template?: {
+      from_name: string;
+      subject_template: string;
+      body_template: string;
+      auto_send_on_complete: boolean;
+    } | null;
+  }
+) {
+  const supabase = await createClient();
+
+  const updates: Record<string, unknown> = {};
+  if (overrides.assigned_user_id !== undefined) {
+    updates.assigned_user_id = overrides.assigned_user_id;
+  }
+  if (overrides.instance_dependencies !== undefined) {
+    updates.instance_dependencies = overrides.instance_dependencies;
+  }
+  if (overrides.instance_visibility_rules !== undefined) {
+    updates.instance_visibility_rules = overrides.instance_visibility_rules;
+  }
+  if (overrides.instance_actions !== undefined) {
+    updates.instance_actions = overrides.instance_actions;
+  }
+  if (overrides.instance_email_template !== undefined) {
+    updates.instance_email_template = overrides.instance_email_template;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error } = await supabase
+      .from("tasks")
+      .update(updates)
+      .eq("id", taskId);
+
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
+  return { success: true };
+}
+
 export async function reorderMergedBlocks(
   taskId: string,
   episodeId: string,

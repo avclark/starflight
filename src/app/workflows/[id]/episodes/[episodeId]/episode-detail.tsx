@@ -22,6 +22,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateTimePicker } from "@/components/date-time-picker";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -39,6 +46,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
 import { TaskFormBlocks, validateRequiredBlocks } from "./task-form-blocks";
@@ -50,6 +59,7 @@ import {
   insertTaskInEpisode,
   moveTaskInEpisode,
   duplicateTaskInEpisode,
+  saveTaskInstanceOverrides,
 } from "@/lib/actions/instance-blocks";
 import {
   completeTask,
@@ -97,6 +107,11 @@ function TaskRow({
   tokenGroups: tokenGroupsProp,
   taskIndex,
   totalTasks,
+  roles,
+  settingDefinitions,
+  showRoleAssignments,
+  dateRules: dateRulesProp,
+  taskTemplatesForRules,
 }: {
   task: Task;
   workflowId: string;
@@ -119,6 +134,11 @@ function TaskRow({
   tokenGroups: ReturnType<typeof buildTokenGroups>;
   taskIndex: number;
   totalTasks: number;
+  roles: { id: string; name: string }[];
+  settingDefinitions: { id: string; label: string }[];
+  showRoleAssignments: { role_id: string; user_id: string }[];
+  dateRules: Tables<"task_template_date_rules">[];
+  taskTemplatesForRules: { id: string; title: string }[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -136,6 +156,71 @@ function TaskRow({
   const [localBlockOrder, setLocalBlockOrder] = useState<string[] | null>(
     Array.isArray(task.block_order) ? (task.block_order as string[]) : null
   );
+  const [localAssignmentMode, setLocalAssignmentMode] = useState<"none" | "user" | "role">(
+    task.assigned_user_id ? "user" : "none"
+  );
+  const [localAssignedUserId, setLocalAssignedUserId] = useState<string | null>(
+    task.assigned_user_id
+  );
+  const [localAssignedRoleId, setLocalAssignedRoleId] = useState<string | null>(null);
+
+  const roleAssignmentMap = new Map(
+    showRoleAssignments.map((a) => [a.role_id, a.user_id])
+  );
+  const [localDependencies, setLocalDependencies] = useState<string[]>(
+    Array.isArray(task.instance_dependencies)
+      ? (task.instance_dependencies as string[])
+      : []
+  );
+
+  type VisRuleDraft = {
+    key: string;
+    name: string;
+    setting_definition_id: string;
+    operator: "must_contain" | "must_not_contain" | "must_not_be_empty" | "must_be_empty";
+    target_value: string | null;
+    is_active: boolean;
+  };
+
+  const existingVisRules = task.instance_visibility_rules as {
+    logic: "and" | "or";
+    rules: VisRuleDraft[];
+  } | null;
+
+  const [visLogic, setVisLogic] = useState<"and" | "or">(
+    existingVisRules?.logic ?? "and"
+  );
+  const [visRules, setVisRules] = useState<VisRuleDraft[]>(() =>
+    (existingVisRules?.rules ?? []).map((r) => ({
+      ...r,
+      key: r.key ?? crypto.randomUUID(),
+    }))
+  );
+
+  type ActionDraft = { key: string; action_type: string };
+  type EmailDraft = {
+    from_name: string;
+    subject_template: string;
+    body_template: string;
+    auto_send_on_complete: boolean;
+  };
+
+  const existingInstanceActions = Array.isArray(task.instance_actions)
+    ? (task.instance_actions as ActionDraft[])
+    : [];
+  const existingInstanceEmail = task.instance_email_template as EmailDraft | null;
+
+  const [localActions, setLocalActions] = useState<ActionDraft[]>(() =>
+    existingInstanceActions.map((a) => ({
+      ...a,
+      key: a.key ?? crypto.randomUUID(),
+    }))
+  );
+  const [localEmail, setLocalEmail] = useState<EmailDraft | null>(
+    existingInstanceEmail
+  );
+
+  const hasLocalEmailAction = localActions.some((a) => a.action_type === "send_email");
 
   const hiddenIds = Array.isArray(task.hidden_template_block_ids)
     ? (task.hidden_template_block_ids as string[])
@@ -207,6 +292,25 @@ function TaskRow({
     if (responsesToSave.length > 0) {
       await saveTaskBlockResponses(task.id, episodeId, workflowId, responsesToSave);
     }
+
+    // Resolve assignment: if role mode, look up show role assignment
+    let resolvedUserId: string | null = null;
+    if (localAssignmentMode === "user") {
+      resolvedUserId = localAssignedUserId;
+    } else if (localAssignmentMode === "role" && localAssignedRoleId) {
+      resolvedUserId = roleAssignmentMap.get(localAssignedRoleId) ?? null;
+    }
+
+    // Save assignment, dependencies, visibility rules, and actions
+    await saveTaskInstanceOverrides(task.id, episodeId, workflowId, {
+      assigned_user_id: resolvedUserId,
+      instance_dependencies: localDependencies,
+      instance_visibility_rules: visRules.length > 0
+        ? { logic: visLogic, rules: visRules }
+        : null,
+      instance_actions: localActions,
+      instance_email_template: hasLocalEmailAction ? localEmail : null,
+    });
 
     setSaving(false);
   }
@@ -340,59 +444,570 @@ function TaskRow({
         </div>
 
         {expanded && (
-          <div className="px-4 pb-4 pt-1 ml-12 space-y-4 border-t bg-muted/30 rounded-b-lg">
-            <div className="grid gap-4 sm:grid-cols-2 pt-3">
-              <div className="space-y-2">
-                <Label>Start Date</Label>
-                <DateTimePicker
-                  value={localStartDate}
-                  onChange={setLocalStartDate}
-                  placeholder="Pick start date & time"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Due Date</Label>
-                <DateTimePicker
-                  value={localDueDate}
-                  onChange={setLocalDueDate}
-                  placeholder="Pick due date & time"
-                />
-              </div>
-            </div>
+          <div className="px-4 pb-4 border-t bg-muted/30 pt-3 rounded-b-lg space-y-4">
+            <Tabs defaultValue="content">
+              <TabsList className="h-8">
+                <TabsTrigger value="content" className="text-xs">Content</TabsTrigger>
+                <TabsTrigger value="assignment" className="text-xs">Assignment</TabsTrigger>
+                <TabsTrigger value="visibility" className="text-xs">Visibility</TabsTrigger>
+                <TabsTrigger value="dependencies" className="text-xs">Dependencies</TabsTrigger>
+                <TabsTrigger value="dates" className="text-xs">Dates</TabsTrigger>
+                <TabsTrigger value="actions" className="text-xs">Actions</TabsTrigger>
+              </TabsList>
 
-            {mergedBlocks.length > 0 && (
-              <>
-                <Separator />
-                <TaskFormBlocks
-                  blocks={mergedBlocks}
-                  responses={responses}
-                  draft={blockDraft}
-                  onUpdate={(blockId, value) =>
-                    setBlockDraft((prev) => ({ ...prev, [blockId]: value }))
-                  }
-                  people={people}
-                  tokenGroups={tokenGroupsProp}
-                  blockActions={(block, index) => (
-                    <BlockActions
-                      block={block as MergedBlock}
-                      index={index}
-                      totalCount={mergedBlocks.length}
+              {/* Content tab */}
+              <TabsContent value="content" className="mt-3 space-y-3">
+                {mergedBlocks.length > 0 && (
+                  <TaskFormBlocks
+                    blocks={mergedBlocks}
+                    responses={responses}
+                    draft={blockDraft}
+                    onUpdate={(blockId, value) =>
+                      setBlockDraft((prev) => ({ ...prev, [blockId]: value }))
+                    }
+                    people={people}
+                    tokenGroups={tokenGroupsProp}
+                    blockActions={(block, index) => (
+                      <BlockActions
+                        block={block as MergedBlock}
+                        index={index}
+                        totalCount={mergedBlocks.length}
+                        taskId={task.id}
+                        episodeId={episodeId}
+                        workflowId={workflowId}
+                        allBlocks={mergedBlocks}
+                        onReorder={(newOrder) => setLocalBlockOrder(newOrder)}
+                      />
+                    )}
+                  />
+                )}
+                <AddBlockButton
+                  taskId={task.id}
+                  episodeId={episodeId}
+                  workflowId={workflowId}
+                />
+                {emailTemplate && (
+                  <>
+                    <Separator />
+                    <EmailPreview
+                      emailTemplate={emailTemplate}
+                      episodeTitle={episodeTitle}
+                      showName={showName}
+                      showSettingsMap={showSettingsMap}
+                      allBlocks={allBlocks}
+                      allResponses={allResponses}
+                      allTasks={allTasks}
+                      allInstanceBlocks={allInstanceBlocks}
                       taskId={task.id}
                       episodeId={episodeId}
                       workflowId={workflowId}
-                      allBlocks={mergedBlocks}
-                      onReorder={(newOrder) => setLocalBlockOrder(newOrder)}
+                      emailBodyOverride={task.email_body_override}
                     />
-                  )}
-                />
-              </>
-            )}
+                  </>
+                )}
+                {mergedBlocks.some((b) => b.block_type === "comments") && (
+                  <>
+                    <Separator />
+                    <TaskComments
+                      taskId={task.id}
+                      episodeId={episodeId}
+                      workflowId={workflowId}
+                      comments={comments}
+                      userMap={userMap}
+                      people={people}
+                    />
+                  </>
+                )}
+              </TabsContent>
 
-            <AddBlockButton
-              taskId={task.id}
-              episodeId={episodeId}
-              workflowId={workflowId}
-            />
+              {/* Assignment tab */}
+              <TabsContent value="assignment" className="mt-3">
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Changes only affect this task in this episode.
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Select
+                      value={localAssignmentMode}
+                      onValueChange={(val: "none" | "user" | "role") => {
+                        setLocalAssignmentMode(val);
+                        if (val === "none") {
+                          setLocalAssignedUserId(null);
+                          setLocalAssignedRoleId(null);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[160px] h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        <SelectItem value="user">Assign to person</SelectItem>
+                        <SelectItem value="role">Assign to role</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {localAssignmentMode === "user" && (
+                      <Select
+                        value={localAssignedUserId ?? ""}
+                        onValueChange={setLocalAssignedUserId}
+                      >
+                        <SelectTrigger className="w-[200px] h-8 text-sm">
+                          <SelectValue placeholder="Select person" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {people.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {localAssignmentMode === "role" && (
+                      <Select
+                        value={localAssignedRoleId ?? ""}
+                        onValueChange={(v) => {
+                          setLocalAssignedRoleId(v);
+                          // Show who this resolves to
+                          const resolved = roleAssignmentMap.get(v);
+                          setLocalAssignedUserId(resolved ?? null);
+                        }}
+                      >
+                        <SelectTrigger className="w-[200px] h-8 text-sm">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {localAssignmentMode === "role" && localAssignedRoleId && (
+                    <p className="text-xs text-muted-foreground">
+                      Resolves to:{" "}
+                      <span className="font-medium text-foreground">
+                        {(() => {
+                          const userId = roleAssignmentMap.get(localAssignedRoleId);
+                          if (!userId) return "No one assigned to this role for this show";
+                          const person = people.find((p) => p.id === userId);
+                          return person?.full_name ?? "Unknown";
+                        })()}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Visibility tab */}
+              <TabsContent value="visibility" className="mt-3">
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Visibility rules for this task in this episode. Changes only affect this episode.
+                  </p>
+
+                  {visRules.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground">Logic:</Label>
+                      <Select value={visLogic} onValueChange={(v: "and" | "or") => setVisLogic(v)}>
+                        <SelectTrigger className="w-[80px] h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="and">AND</SelectItem>
+                          <SelectItem value="or">OR</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-muted-foreground">
+                        {visLogic === "and" ? "All rules must pass" : "Any rule passes"}
+                      </span>
+                    </div>
+                  )}
+
+                  {visRules.map((rule) => (
+                    <div key={rule.key} className="rounded border p-3 space-y-2 bg-background">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={rule.name}
+                          onChange={(e) =>
+                            setVisRules((prev) =>
+                              prev.map((r) =>
+                                r.key === rule.key ? { ...r, name: e.target.value } : r
+                              )
+                            )
+                          }
+                          placeholder="Rule name"
+                          className="flex-1 h-7 text-sm"
+                        />
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                          <Checkbox
+                            checked={rule.is_active}
+                            onCheckedChange={(checked) =>
+                              setVisRules((prev) =>
+                                prev.map((r) =>
+                                  r.key === rule.key ? { ...r, is_active: !!checked } : r
+                                )
+                              )
+                            }
+                          />
+                          Active
+                        </label>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() =>
+                            setVisRules((prev) => [
+                              ...prev,
+                              { ...rule, key: crypto.randomUUID(), name: `${rule.name} (copy)` },
+                            ])
+                          }
+                        >
+                          Duplicate
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setVisRules((prev) => prev.filter((r) => r.key !== rule.key))
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Select
+                          value={rule.setting_definition_id}
+                          onValueChange={(v) =>
+                            setVisRules((prev) =>
+                              prev.map((r) =>
+                                r.key === rule.key ? { ...r, setting_definition_id: v } : r
+                              )
+                            )
+                          }
+                        >
+                          <SelectTrigger className="w-[260px] h-7 text-xs">
+                            <SelectValue placeholder="Select setting" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {settingDefinitions.map((sd) => (
+                              <SelectItem key={sd.id} value={sd.id}>{sd.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={rule.operator}
+                          onValueChange={(v) =>
+                            setVisRules((prev) =>
+                              prev.map((r) =>
+                                r.key === rule.key
+                                  ? { ...r, operator: v as VisRuleDraft["operator"] }
+                                  : r
+                              )
+                            )
+                          }
+                        >
+                          <SelectTrigger className="w-[160px] h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="must_contain">must contain</SelectItem>
+                            <SelectItem value="must_not_contain">must not contain</SelectItem>
+                            <SelectItem value="must_not_be_empty">must not be empty</SelectItem>
+                            <SelectItem value="must_be_empty">must be empty</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {(rule.operator === "must_contain" || rule.operator === "must_not_contain") && (
+                          <Input
+                            value={rule.target_value ?? ""}
+                            onChange={(e) =>
+                              setVisRules((prev) =>
+                                prev.map((r) =>
+                                  r.key === rule.key ? { ...r, target_value: e.target.value } : r
+                                )
+                              )
+                            }
+                            placeholder="Target value"
+                            className="w-[160px] h-7 text-xs"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setVisRules((prev) => [
+                        ...prev,
+                        {
+                          key: crypto.randomUUID(),
+                          name: "",
+                          setting_definition_id: settingDefinitions[0]?.id ?? "",
+                          operator: "must_contain" as const,
+                          target_value: "",
+                          is_active: true,
+                        },
+                      ])
+                    }
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Add Rule
+                  </Button>
+                </div>
+              </TabsContent>
+
+              {/* Dependencies tab */}
+              <TabsContent value="dependencies" className="mt-3">
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Block this task until selected tasks are completed. Changes only affect this episode.
+                  </p>
+                  {localDependencies.length > 0 && (
+                    <div className="space-y-1">
+                      {localDependencies.map((depId) => {
+                        const depTask = allTasks.find((t) => t.id === depId);
+                        return (
+                          <div key={depId} className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Blocked until</span>
+                            <Badge variant="secondary">{depTask?.title ?? "Unknown"}</Badge>
+                            <span className="text-muted-foreground">is completed</span>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={() =>
+                                setLocalDependencies((prev) =>
+                                  prev.filter((id) => id !== depId)
+                                )
+                              }
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {(() => {
+                    const available = allTasks.filter(
+                      (t) =>
+                        t.id !== task.id && !localDependencies.includes(t.id)
+                    );
+                    return available.length > 0 ? (
+                      <Select
+                        onValueChange={(v) =>
+                          setLocalDependencies((prev) => [...prev, v])
+                        }
+                      >
+                        <SelectTrigger className="w-[260px] h-8 text-sm">
+                          <SelectValue placeholder="Add dependency..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {available.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null;
+                  })()}
+                </div>
+              </TabsContent>
+
+              {/* Dates tab */}
+              <TabsContent value="dates" className="mt-3 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <DateTimePicker
+                      value={localStartDate}
+                      onChange={setLocalStartDate}
+                      placeholder="Pick start date & time"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Due Date</Label>
+                    <DateTimePicker
+                      value={localDueDate}
+                      onChange={setLocalDueDate}
+                      placeholder="Pick due date & time"
+                    />
+                  </div>
+                </div>
+
+                {dateRulesProp.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">
+                      Date Rules (from process template)
+                    </Label>
+                    {dateRulesProp.map((rule) => {
+                      const refTemplate = rule.relative_task_template_id
+                        ? taskTemplatesForRules.find((t) => t.id === rule.relative_task_template_id)
+                        : null;
+                      return (
+                        <p key={rule.id} className="text-xs text-muted-foreground italic rounded border p-2 bg-background">
+                          {rule.date_field === "start_date" ? "Start" : "Due"} date:{" "}
+                          {rule.offset_days} day{rule.offset_days !== 1 ? "s" : ""},{" "}
+                          {rule.offset_hours} hour{rule.offset_hours !== 1 ? "s" : ""} after{" "}
+                          {rule.relative_to === "episode_start"
+                            ? "episode is created"
+                            : refTemplate
+                            ? `"${refTemplate.title}" ${rule.relative_to === "task_start" ? "starts" : "is due"}`
+                            : "unknown task"}
+                        </p>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Actions tab */}
+              <TabsContent value="actions" className="mt-3">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Completion Actions</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Actions that fire when this task is marked complete. Changes only affect this episode.
+                    </p>
+                  </div>
+
+                  {emailTemplate && (
+                    <div className="rounded border p-2 bg-background space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        Inherited from process template:
+                      </p>
+                      <Badge variant="secondary" className="text-xs">Send Email</Badge>
+                      {emailTemplate.auto_send_on_complete && (
+                        <Badge variant="outline" className="text-xs ml-1">Auto-send</Badge>
+                      )}
+                    </div>
+                  )}
+
+                  {localActions.length === 0 && !emailTemplate && (
+                    <p className="text-xs text-muted-foreground">No actions configured.</p>
+                  )}
+
+                  {localActions.map((action) => (
+                    <div key={action.key} className="flex items-center gap-2 rounded border p-2 bg-background">
+                      <Badge variant="secondary" className="text-xs">
+                        {action.action_type === "send_notification" ? "Send Notification" :
+                         action.action_type === "send_email" ? "Send Email" : action.action_type}
+                      </Badge>
+                      <div className="flex-1" />
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => {
+                          const removed = localActions.find((a) => a.key === action.key);
+                          setLocalActions((prev) => prev.filter((a) => a.key !== action.key));
+                          if (removed?.action_type === "send_email") {
+                            const stillHas = localActions.some(
+                              (a) => a.key !== action.key && a.action_type === "send_email"
+                            );
+                            if (!stillHas) setLocalEmail(null);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Select
+                    onValueChange={(v) => {
+                      setLocalActions((prev) => [
+                        ...prev,
+                        { key: crypto.randomUUID(), action_type: v },
+                      ]);
+                      if (v === "send_email" && !localEmail) {
+                        setLocalEmail({
+                          from_name: "",
+                          subject_template: "",
+                          body_template: "",
+                          auto_send_on_complete: false,
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[200px] h-8 text-sm">
+                      <SelectValue placeholder="Add action..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="send_notification">Send Notification</SelectItem>
+                      <SelectItem value="send_email">Send Email</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {hasLocalEmailAction && localEmail && (
+                    <>
+                      <Separator />
+                      <div className="space-y-3">
+                        <Label className="text-xs text-muted-foreground">Email Template</Label>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs">From Name</Label>
+                          <Input
+                            value={localEmail.from_name}
+                            onChange={(e) => setLocalEmail({ ...localEmail, from_name: e.target.value })}
+                            placeholder="e.g. Production Team"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs">Subject</Label>
+                          <Input
+                            value={localEmail.subject_template}
+                            onChange={(e) => setLocalEmail({ ...localEmail, subject_template: e.target.value })}
+                            placeholder="e.g. {{episode.title}} — Files Ready"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs">Body</Label>
+                          <Textarea
+                            value={localEmail.body_template}
+                            onChange={(e) => setLocalEmail({ ...localEmail, body_template: e.target.value })}
+                            placeholder="Email body with tokens..."
+                            className="min-h-[100px] text-sm"
+                          />
+                        </div>
+
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                          <Checkbox
+                            checked={localEmail.auto_send_on_complete}
+                            onCheckedChange={(checked) =>
+                              setLocalEmail({ ...localEmail, auto_send_on_complete: !!checked })
+                            }
+                          />
+                          Auto-send when task is marked complete
+                        </label>
+
+                        <div className="rounded border p-2 bg-muted/50 space-y-1 max-h-48 overflow-auto">
+                          <p className="text-xs font-medium text-muted-foreground">Available tokens:</p>
+                          {tokenGroupsProp.map((group) => (
+                            <div key={group.label}>
+                              {group.tokens.map((t) => (
+                                <code key={t.token} className="block text-xs text-muted-foreground">{t.display}</code>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
 
             {validationErrors.length > 0 && (
               <p className="text-sm text-destructive">
@@ -415,40 +1030,6 @@ function TaskRow({
                 </Button>
               )}
             </div>
-
-            {emailTemplate && (
-              <>
-                <Separator />
-                <EmailPreview
-                  emailTemplate={emailTemplate}
-                  episodeTitle={episodeTitle}
-                  showName={showName}
-                  showSettingsMap={showSettingsMap}
-                  allBlocks={allBlocks}
-                  allResponses={allResponses}
-                  allTasks={allTasks}
-                  allInstanceBlocks={allInstanceBlocks}
-                  taskId={task.id}
-                  episodeId={episodeId}
-                  workflowId={workflowId}
-                  emailBodyOverride={task.email_body_override}
-                />
-              </>
-            )}
-
-            {mergedBlocks.some((b) => b.block_type === "comments") && (
-              <>
-                <Separator />
-                <TaskComments
-                  taskId={task.id}
-                  episodeId={episodeId}
-                  workflowId={workflowId}
-                  comments={comments}
-                  userMap={userMap}
-                  people={people}
-                />
-              </>
-            )}
           </div>
         )}
       </div>
@@ -488,6 +1069,11 @@ export function EpisodeDetail({
   emailTemplates = [],
   showSettingsMap = {},
   instanceBlocks = [],
+  roles = [],
+  settingDefinitions = [],
+  showRoleAssignments = [],
+  dateRules = [],
+  taskTemplatesForRules = [],
 }: {
   workflowId: string;
   episode: {
@@ -506,6 +1092,11 @@ export function EpisodeDetail({
   emailTemplates?: EmailTpl[];
   showSettingsMap?: Record<string, string>;
   instanceBlocks?: InstanceBlock[];
+  roles?: { id: string; name: string }[];
+  settingDefinitions?: { id: string; label: string }[];
+  showRoleAssignments?: { role_id: string; user_id: string }[];
+  dateRules?: Tables<"task_template_date_rules">[];
+  taskTemplatesForRules?: { id: string; title: string }[];
 }) {
   // Build token groups for the token insert feature
   const settingDefs = Object.keys(showSettingsMap).map((label, i) => ({
@@ -644,6 +1235,11 @@ export function EpisodeDetail({
               tokenGroups={tokenGroups}
               taskIndex={taskIndex}
               totalTasks={tasks.length}
+              roles={roles}
+              settingDefinitions={settingDefinitions}
+              showRoleAssignments={showRoleAssignments}
+              dateRules={dateRules.filter((r) => r.task_template_id === task.task_template_id)}
+              taskTemplatesForRules={taskTemplatesForRules}
             />
             </div>
           ))

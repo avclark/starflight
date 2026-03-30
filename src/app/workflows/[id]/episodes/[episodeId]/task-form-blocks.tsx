@@ -55,7 +55,7 @@ export function TaskFormBlocks({
   if (renderableBlocks.length === 0) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {renderableBlocks.map((block, index) => {
         const value =
           draft[block.id] !== undefined
@@ -63,8 +63,8 @@ export function TaskFormBlocks({
             : responseMap.get(block.id) ?? null;
 
         return (
-          <div key={block.id} className="flex items-start gap-2">
-            <div className="flex-1">
+          <div key={block.id} className="rounded border p-3 bg-background flex items-start gap-2">
+            <div className="flex-1 min-w-0">
               <BlockRenderer
                 block={block}
                 value={value}

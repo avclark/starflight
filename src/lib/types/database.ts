@@ -536,6 +536,10 @@ export interface Database {
           email_body_override: string | null;
           hidden_template_block_ids: Json;
           block_order: Json | null;
+          instance_actions: Json;
+          instance_email_template: Json | null;
+          instance_dependencies: Json;
+          instance_visibility_rules: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -555,6 +559,10 @@ export interface Database {
           email_body_override?: string | null;
           hidden_template_block_ids?: Json;
           block_order?: Json | null;
+          instance_actions?: Json;
+          instance_email_template?: Json | null;
+          instance_dependencies?: Json;
+          instance_visibility_rules?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -574,6 +582,10 @@ export interface Database {
           email_body_override?: string | null;
           hidden_template_block_ids?: Json;
           block_order?: Json | null;
+          instance_actions?: Json;
+          instance_email_template?: Json | null;
+          instance_dependencies?: Json;
+          instance_visibility_rules?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
