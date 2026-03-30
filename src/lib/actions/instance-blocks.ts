@@ -219,6 +219,19 @@ export async function insertTaskInEpisode(
   return { success: true };
 }
 
+export async function reorderTasksInEpisode(
+  episodeId: string,
+  workflowId: string,
+  orderedTaskIds: string[]
+) {
+  const supabase = await createClient();
+  for (let i = 0; i < orderedTaskIds.length; i++) {
+    await supabase.from("tasks").update({ position: i }).eq("id", orderedTaskIds[i]);
+  }
+  revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
+  return { success: true };
+}
+
 export async function moveTaskInEpisode(
   taskId: string,
   episodeId: string,

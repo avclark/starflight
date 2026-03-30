@@ -43,6 +43,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { InlineEdit } from "@/components/inline-edit";
+import { SortableList, SortableItem, DragHandle, arrayMove } from "@/components/sortable-list";
+import { TaskPicker } from "@/components/task-picker";
+import { duplicateTaskToProcess } from "@/lib/actions/duplicate-task";
 import { ActionsSection } from "./actions-section";
 import { ContentSection } from "./content-section";
 import { DatesSection } from "./dates-section";
@@ -53,6 +56,7 @@ import {
   insertTaskTemplateAt,
   duplicateTaskTemplate,
   moveTaskTemplate,
+  reorderTaskTemplates,
 } from "@/lib/actions/processes";
 import {
   saveVisibilityRules,
@@ -441,8 +445,17 @@ export function TaskTemplateList({
   emailTemplates: EmailTpl[];
 }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<"task_templates"> | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [localTemplateOrder, setLocalTemplateOrder] = useState<string[] | null>(null);
+
+  // Use optimistic order if set, otherwise use prop order
+  const orderedTemplates = localTemplateOrder
+    ? localTemplateOrder
+        .map((id) => templates.find((t) => t.id === id))
+        .filter(Boolean) as Tables<"task_templates">[]
+    : templates;
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -472,28 +485,45 @@ export function TaskTemplateList({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Task Templates</h2>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Task Template</DialogTitle>
-            </DialogHeader>
-            <form action={handleAdd} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" placeholder="Task title" required autoFocus />
-              </div>
-              <div className="flex justify-end">
-                <Button type="submit">Add</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Blank Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Task Template</DialogTitle>
+              </DialogHeader>
+              <form action={handleAdd} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title</Label>
+                  <Input id="title" name="title" placeholder="Task title" required autoFocus />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit">Add</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPickerOpen(true)}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Copy from Existing
+          </Button>
+          <TaskPicker
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            onSelect={async (templateId) => {
+              await duplicateTaskToProcess(templateId, processId);
+            }}
+          />
+        </div>
       </div>
 
       {templates.length === 0 ? (
@@ -501,8 +531,17 @@ export function TaskTemplateList({
           No task templates yet. Add one to define steps in this process.
         </p>
       ) : (
-        <div className="space-y-0">
-          {templates.map((t, i) => {
+        <SortableList
+          items={orderedTemplates.map((t) => t.id)}
+          onReorder={(oldIndex, newIndex) => {
+            const ids = orderedTemplates.map((t) => t.id);
+            const newIds = arrayMove(ids, oldIndex, newIndex);
+            setLocalTemplateOrder(newIds);
+            reorderTaskTemplates(processId, newIds);
+          }}
+          className="space-y-0"
+        >
+          {orderedTemplates.map((t, i) => {
             const isExpanded = expanded.has(t.id);
             const label = assignmentLabel(t, roles, people);
             const ruleCount = visibilityRules.filter((r) => r.task_template_id === t.id).length;
@@ -510,7 +549,9 @@ export function TaskTemplateList({
             const blockCount = blocks.filter((b) => b.task_template_id === t.id).length;
 
             return (
-              <div key={t.id}>
+              <SortableItem key={t.id} id={t.id}>
+                {({ dragHandleProps, isDragging }) => (
+                <div>
                 {/* Insert button between cards */}
                 {i > 0 && (
                   <div className="flex items-center justify-center py-1">
@@ -536,11 +577,12 @@ export function TaskTemplateList({
                 )}
 
                 {/* Task card */}
-                <div className="rounded-lg border bg-card">
+                <div className={`rounded-lg border bg-card ${isDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}>
                   <div
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/50 rounded-t-lg"
                     onClick={() => toggleExpanded(t.id)}
                   >
+                    <DragHandle dragHandleProps={dragHandleProps} />
                     <div className="text-muted-foreground">
                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </div>
@@ -689,9 +731,11 @@ export function TaskTemplateList({
                   )}
                 </div>
               </div>
+              )}
+              </SortableItem>
             );
           })}
-        </div>
+        </SortableList>
       )}
 
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>

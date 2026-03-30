@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SortableList, SortableItem, DragHandle, arrayMove } from "@/components/sortable-list";
 import {
   ArrowDown,
   ArrowDownToLine,
@@ -222,6 +223,8 @@ function ProcessBlockCard({
   onRemove,
   autoOpenSettings = false,
   onSettingsClosed,
+  dragHandleProps,
+  isDragging,
 }: {
   block: DraftBlock;
   index: number;
@@ -232,12 +235,15 @@ function ProcessBlockCard({
   onRemove: () => void;
   autoOpenSettings?: boolean;
   onSettingsClosed?: () => void;
+  dragHandleProps?: Record<string, unknown>;
+  isDragging?: boolean;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(autoOpenSettings);
 
   return (
     <>
-      <div className="rounded border p-3 bg-background flex items-start gap-2">
+      <div className={`rounded border p-3 bg-background flex items-start gap-2 ${isDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}>
+        {dragHandleProps && <DragHandle dragHandleProps={dragHandleProps} className="mt-0.5" />}
         <div className="flex-1 min-w-0">
           <BlockPreview block={block} />
         </div>
@@ -441,20 +447,35 @@ export function ContentSection({
         </p>
       )}
 
-      {blocks.map((block, i) => (
-        <ProcessBlockCard
-          key={block.key}
-          block={block}
-          index={i}
-          total={blocks.length}
-          onUpdate={(patch) => updateBlock(block.key, patch)}
-          onMove={(dir: "up" | "down" | "top" | "bottom") => moveBlock(block.key, dir)}
-          onDuplicate={() => duplicateBlock(block.key)}
-          onRemove={() => removeBlock(block.key)}
-          autoOpenSettings={block.key === newBlockKey}
-          onSettingsClosed={() => { if (block.key === newBlockKey) setNewBlockKey(null); }}
-        />
-      ))}
+      {blocks.length > 0 && (
+        <SortableList
+          items={blocks.map((b) => b.key)}
+          onReorder={(oldIndex, newIndex) => {
+            setBlocks((prev) => arrayMove(prev, oldIndex, newIndex));
+          }}
+          className="space-y-3"
+        >
+          {blocks.map((block, i) => (
+            <SortableItem key={block.key} id={block.key}>
+              {({ dragHandleProps, isDragging }) => (
+                <ProcessBlockCard
+                  block={block}
+                  index={i}
+                  total={blocks.length}
+                  onUpdate={(patch) => updateBlock(block.key, patch)}
+                  onMove={(dir: "up" | "down" | "top" | "bottom") => moveBlock(block.key, dir)}
+                  onDuplicate={() => duplicateBlock(block.key)}
+                  onRemove={() => removeBlock(block.key)}
+                  autoOpenSettings={block.key === newBlockKey}
+                  onSettingsClosed={() => { if (block.key === newBlockKey) setNewBlockKey(null); }}
+                  dragHandleProps={dragHandleProps}
+                  isDragging={isDragging}
+                />
+              )}
+            </SortableItem>
+          ))}
+        </SortableList>
+      )}
 
       <div className="flex items-center gap-2">
         <Select

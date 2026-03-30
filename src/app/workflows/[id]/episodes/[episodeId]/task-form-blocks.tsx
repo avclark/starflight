@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { SortableList, SortableItem, DragHandle } from "@/components/sortable-list";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,7 @@ export function TaskFormBlocks({
   people,
   blockActions,
   tokenGroups,
+  onBlockReorder,
 }: {
   blocks: Block[];
   responses: Response[];
@@ -46,6 +48,7 @@ export function TaskFormBlocks({
   people: Person[];
   blockActions?: (block: Block, index: number) => React.ReactNode;
   tokenGroups?: TokenGroup[];
+  onBlockReorder?: (oldIndex: number, newIndex: number) => void;
 }) {
   const responseMap = new Map(
     responses.map((r) => [r.task_template_block_id, r.value_json])
@@ -54,29 +57,51 @@ export function TaskFormBlocks({
   const renderableBlocks = blocks.filter((b) => b.block_type !== "comments");
   if (renderableBlocks.length === 0) return null;
 
-  return (
-    <div className="space-y-3">
-      {renderableBlocks.map((block, index) => {
-        const value =
-          draft[block.id] !== undefined
-            ? draft[block.id]
-            : responseMap.get(block.id) ?? null;
+  const blockList = renderableBlocks.map((block, index) => {
+    const value =
+      draft[block.id] !== undefined
+        ? draft[block.id]
+        : responseMap.get(block.id) ?? null;
 
-        return (
-          <div key={block.id} className="rounded border p-3 bg-background flex items-start gap-2">
-            <div className="flex-1 min-w-0">
-              <BlockRenderer
-                block={block}
-                value={value}
-                onChange={(val) => onUpdate(block.id, val)}
-                people={people}
-                tokenGroups={tokenGroups}
-              />
-            </div>
-            {blockActions?.(block, index)}
-          </div>
-        );
-      })}
+    const content = (dragHandleProps?: Record<string, unknown>, isDragging?: boolean) => (
+      <div className={`rounded border p-3 bg-background flex items-start gap-2 ${isDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}>
+        {dragHandleProps && <DragHandle dragHandleProps={dragHandleProps} className="mt-0.5" />}
+        <div className="flex-1 min-w-0">
+          <BlockRenderer
+            block={block}
+            value={value}
+            onChange={(val) => onUpdate(block.id, val)}
+            people={people}
+            tokenGroups={tokenGroups}
+          />
+        </div>
+        {blockActions?.(block, index)}
+      </div>
+    );
+
+    if (onBlockReorder) {
+      return (
+        <SortableItem key={block.id} id={block.id}>
+          {({ dragHandleProps, isDragging }) => content(dragHandleProps, isDragging)}
+        </SortableItem>
+      );
+    }
+    return <div key={block.id}>{content()}</div>;
+  });
+
+  return (
+    <div>
+      {onBlockReorder ? (
+        <SortableList
+          items={renderableBlocks.map((b) => b.id)}
+          onReorder={onBlockReorder}
+          className="space-y-3"
+        >
+          {blockList}
+        </SortableList>
+      ) : (
+        <div className="space-y-3">{blockList}</div>
+      )}
     </div>
   );
 }

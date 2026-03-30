@@ -197,6 +197,21 @@ export async function duplicateTaskTemplate(templateId: string, processId: strin
   return { success: true };
 }
 
+export async function reorderTaskTemplates(
+  processId: string,
+  orderedIds: string[]
+) {
+  const supabase = await createClient();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await supabase
+      .from("task_templates")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
+  }
+  revalidatePath(`/processes/${processId}`);
+  return { success: true };
+}
+
 export async function moveTaskTemplate(
   templateId: string,
   processId: string,

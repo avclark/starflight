@@ -50,6 +50,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
+import { SortableList, SortableItem, DragHandle, arrayMove } from "@/components/sortable-list";
+import { TaskPicker } from "@/components/task-picker";
+import { duplicateTaskToEpisode } from "@/lib/actions/duplicate-task";
 import { TaskFormBlocks, validateRequiredBlocks } from "./task-form-blocks";
 import { TaskComments } from "./task-comments";
 import { mergeBlocks, BlockActions, AddBlockButton, type MergedBlock } from "./episode-block-manager";
@@ -60,6 +63,8 @@ import {
   moveTaskInEpisode,
   duplicateTaskInEpisode,
   saveTaskInstanceOverrides,
+  reorderTasksInEpisode,
+  reorderMergedBlocks,
 } from "@/lib/actions/instance-blocks";
 import {
   completeTask,
@@ -112,6 +117,8 @@ function TaskRow({
   showRoleAssignments,
   dateRules: dateRulesProp,
   taskTemplatesForRules,
+  dragHandleProps: taskDragHandleProps,
+  isTaskDragging,
 }: {
   task: Task;
   workflowId: string;
@@ -139,6 +146,8 @@ function TaskRow({
   showRoleAssignments: { role_id: string; user_id: string }[];
   dateRules: Tables<"task_template_date_rules">[];
   taskTemplatesForRules: { id: string; title: string }[];
+  dragHandleProps?: Record<string, unknown>;
+  isTaskDragging?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -322,11 +331,16 @@ function TaskRow({
 
   return (
     <>
-      <div className="rounded-lg border bg-card">
+      <div className={`rounded-lg border bg-card ${isTaskDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}>
         <div
           className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 cursor-pointer rounded-t-lg"
           onClick={() => setExpanded(!expanded)}
         >
+          {taskDragHandleProps && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <DragHandle dragHandleProps={taskDragHandleProps} />
+            </div>
+          )}
           <div onClick={(e) => e.stopPropagation()}>
             <Checkbox
               checked={isCompleted}
@@ -467,6 +481,14 @@ function TaskRow({
                     }
                     people={people}
                     tokenGroups={tokenGroupsProp}
+                    onBlockReorder={(oldIndex, newIndex) => {
+                      const reordered = [...mergedBlocks];
+                      const [item] = reordered.splice(oldIndex, 1);
+                      reordered.splice(newIndex, 0, item);
+                      const newOrder = reordered.map((b) => b.id);
+                      setLocalBlockOrder(newOrder);
+                      reorderMergedBlocks(task.id, episodeId, workflowId, newOrder);
+                    }}
                     blockActions={(block, index) => (
                       <BlockActions
                         block={block as MergedBlock}
@@ -1121,6 +1143,12 @@ export function EpisodeDetail({
     })),
   });
 
+  const [localTaskOrder, setLocalTaskOrder] = useState<string[] | null>(null);
+  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
+  const orderedTasks = localTaskOrder
+    ? localTaskOrder.map((id) => tasks.find((t) => t.id === id)).filter(Boolean) as Task[]
+    : tasks;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -1162,14 +1190,45 @@ export function EpisodeDetail({
         </div>
       </div>
 
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setTaskPickerOpen(true)}
+        >
+          <Copy className="mr-2 h-4 w-4" />
+          Copy Task from Existing
+        </Button>
+        <TaskPicker
+          open={taskPickerOpen}
+          onOpenChange={setTaskPickerOpen}
+          onSelect={async (templateId) => {
+            // Use the first task's template_id as FK placeholder
+            const firstTaskTemplateId = tasks[0]?.task_template_id ?? templateId;
+            await duplicateTaskToEpisode(templateId, episode.id, workflowId, firstTaskTemplateId);
+          }}
+        />
+      </div>
+
       <div className="space-y-0">
-        {tasks.length === 0 ? (
+        {orderedTasks.length === 0 ? (
           <div className="text-center text-muted-foreground py-8 rounded-md border">
             No tasks in this episode.
           </div>
         ) : (
-          tasks.map((task, taskIndex) => (
-            <div key={task.id}>
+          <SortableList
+            items={orderedTasks.map((t) => t.id)}
+            onReorder={(oldIndex, newIndex) => {
+              const ids = orderedTasks.map((t) => t.id);
+              const newIds = arrayMove(ids, oldIndex, newIndex);
+              setLocalTaskOrder(newIds);
+              reorderTasksInEpisode(episode.id, workflowId, newIds);
+            }}
+          >
+          {orderedTasks.map((task, taskIndex) => (
+            <SortableItem key={task.id} id={task.id}>
+              {({ dragHandleProps, isDragging: isTaskDragging }) => (
+            <div>
               {taskIndex > 0 && (
                 <>
                   <div className="flex items-center justify-center py-1">
@@ -1240,9 +1299,14 @@ export function EpisodeDetail({
               showRoleAssignments={showRoleAssignments}
               dateRules={dateRules.filter((r) => r.task_template_id === task.task_template_id)}
               taskTemplatesForRules={taskTemplatesForRules}
+              dragHandleProps={dragHandleProps}
+              isTaskDragging={isTaskDragging}
             />
             </div>
-          ))
+              )}
+            </SortableItem>
+          ))}
+          </SortableList>
         )}
       </div>
     </div>
