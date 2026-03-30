@@ -219,6 +219,87 @@ export async function insertTaskInEpisode(
   return { success: true };
 }
 
+export async function moveTaskInEpisode(
+  taskId: string,
+  episodeId: string,
+  workflowId: string,
+  direction: "up" | "down" | "top" | "bottom"
+) {
+  const supabase = await createClient();
+
+  const { data: all } = await supabase
+    .from("tasks")
+    .select("id, position")
+    .eq("episode_id", episodeId)
+    .eq("is_visible", true)
+    .order("position");
+
+  if (!all) return { error: "Failed to fetch tasks" };
+
+  const ids = all.map((t) => t.id);
+  const idx = ids.indexOf(taskId);
+  if (idx === -1) return { error: "Task not found" };
+
+  ids.splice(idx, 1);
+  switch (direction) {
+    case "top": ids.unshift(taskId); break;
+    case "up": ids.splice(Math.max(0, idx - 1), 0, taskId); break;
+    case "down": ids.splice(Math.min(ids.length, idx + 1), 0, taskId); break;
+    case "bottom": ids.push(taskId); break;
+  }
+
+  for (let i = 0; i < ids.length; i++) {
+    await supabase.from("tasks").update({ position: i }).eq("id", ids[i]);
+  }
+
+  revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
+  return { success: true };
+}
+
+export async function duplicateTaskInEpisode(
+  taskId: string,
+  episodeId: string,
+  workflowId: string
+) {
+  const supabase = await createClient();
+
+  const { data: source } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("id", taskId)
+    .single();
+
+  if (!source) return { error: "Task not found" };
+
+  // Shift tasks after the source
+  const { data: toShift } = await supabase
+    .from("tasks")
+    .select("id, position")
+    .eq("episode_id", episodeId)
+    .gt("position", source.position)
+    .order("position", { ascending: false });
+
+  for (const t of toShift ?? []) {
+    await supabase.from("tasks").update({ position: t.position + 1 }).eq("id", t.id);
+  }
+
+  const { error } = await supabase.from("tasks").insert({
+    episode_id: episodeId,
+    task_template_id: source.task_template_id,
+    title: `${source.title} (copy)`,
+    position: source.position + 1,
+    status: "open",
+    is_visible: true,
+    assigned_user_id: source.assigned_user_id,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
+  revalidatePath(`/workflows/${workflowId}`);
+  return { success: true };
+}
+
 export async function reorderMergedBlocks(
   taskId: string,
   episodeId: string,

@@ -5,10 +5,15 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ClientDateRange } from "@/components/client-date";
 import {
+  ArrowDown,
+  ArrowDownToLine,
   ArrowLeft,
+  ArrowUp,
+  ArrowUpToLine,
   Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   MoreHorizontal,
   Plus,
   Trash2,
@@ -30,6 +35,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
@@ -39,7 +45,12 @@ import { TaskFormBlocks, validateRequiredBlocks } from "./task-form-blocks";
 import { TaskComments } from "./task-comments";
 import { mergeBlocks, BlockActions, AddBlockButton, type MergedBlock } from "./episode-block-manager";
 import { buildTokenGroups } from "@/components/token-insert";
-import { renameTaskInEpisode, insertTaskInEpisode } from "@/lib/actions/instance-blocks";
+import {
+  renameTaskInEpisode,
+  insertTaskInEpisode,
+  moveTaskInEpisode,
+  duplicateTaskInEpisode,
+} from "@/lib/actions/instance-blocks";
 import {
   completeTask,
   uncompleteTask,
@@ -84,6 +95,8 @@ function TaskRow({
   instanceBlocks,
   allInstanceBlocks,
   tokenGroups: tokenGroupsProp,
+  taskIndex,
+  totalTasks,
 }: {
   task: Task;
   workflowId: string;
@@ -104,6 +117,8 @@ function TaskRow({
   instanceBlocks: InstanceBlock[];
   allInstanceBlocks: InstanceBlock[];
   tokenGroups: ReturnType<typeof buildTokenGroups>;
+  taskIndex: number;
+  totalTasks: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -277,6 +292,41 @@ function TaskRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => duplicateTaskInEpisode(task.id, episodeId, workflowId)}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={taskIndex === 0}
+                  onClick={() => moveTaskInEpisode(task.id, episodeId, workflowId, "up")}
+                >
+                  <ArrowUp className="mr-2 h-4 w-4" />
+                  Move Up
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={taskIndex === totalTasks - 1}
+                  onClick={() => moveTaskInEpisode(task.id, episodeId, workflowId, "down")}
+                >
+                  <ArrowDown className="mr-2 h-4 w-4" />
+                  Move Down
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={taskIndex === 0}
+                  onClick={() => moveTaskInEpisode(task.id, episodeId, workflowId, "top")}
+                >
+                  <ArrowUpToLine className="mr-2 h-4 w-4" />
+                  Move to Top
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={taskIndex === totalTasks - 1}
+                  onClick={() => moveTaskInEpisode(task.id, episodeId, workflowId, "bottom")}
+                >
+                  <ArrowDownToLine className="mr-2 h-4 w-4" />
+                  Move to Bottom
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={() => setDeleteOpen(true)}
@@ -592,6 +642,8 @@ export function EpisodeDetail({
               )}
               allInstanceBlocks={instanceBlocks}
               tokenGroups={tokenGroups}
+              taskIndex={taskIndex}
+              totalTasks={tasks.length}
             />
             </div>
           ))
