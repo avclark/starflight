@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,9 +14,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TokenInsert, type buildTokenGroups } from "@/components/token-insert";
 import type { Tables, Json } from "@/lib/types/database";
 
-type Block = Tables<"task_template_blocks">;
+type TokenGroup = ReturnType<typeof buildTokenGroups>[number];
+
+type Block = {
+  id: string;
+  block_type: string;
+  label: string;
+  required: boolean;
+  options_json: Json | null;
+  [key: string]: unknown;
+};
 type Response = Tables<"task_block_responses">;
 type Person = { id: string; full_name: string };
 
@@ -25,12 +36,16 @@ export function TaskFormBlocks({
   draft,
   onUpdate,
   people,
+  blockActions,
+  tokenGroups,
 }: {
   blocks: Block[];
   responses: Response[];
   draft: Record<string, Json | null>;
   onUpdate: (blockId: string, value: Json | null) => void;
   people: Person[];
+  blockActions?: (block: Block, index: number) => React.ReactNode;
+  tokenGroups?: TokenGroup[];
 }) {
   const responseMap = new Map(
     responses.map((r) => [r.task_template_block_id, r.value_json])
@@ -41,20 +56,24 @@ export function TaskFormBlocks({
 
   return (
     <div className="space-y-4">
-      {renderableBlocks.map((block) => {
+      {renderableBlocks.map((block, index) => {
         const value =
           draft[block.id] !== undefined
             ? draft[block.id]
             : responseMap.get(block.id) ?? null;
 
         return (
-          <div key={block.id}>
-            <BlockRenderer
-              block={block}
-              value={value}
-              onChange={(val) => onUpdate(block.id, val)}
-              people={people}
-            />
+          <div key={block.id} className="flex items-start gap-2">
+            <div className="flex-1">
+              <BlockRenderer
+                block={block}
+                value={value}
+                onChange={(val) => onUpdate(block.id, val)}
+                people={people}
+                tokenGroups={tokenGroups}
+              />
+            </div>
+            {blockActions?.(block, index)}
           </div>
         );
       })}
@@ -99,11 +118,13 @@ function BlockRenderer({
   value,
   onChange,
   people,
+  tokenGroups,
 }: {
   block: Block;
   value: Json | null;
   onChange: (val: Json | null) => void;
   people: Person[];
+  tokenGroups?: TokenGroup[];
 }) {
   const required = block.required;
   const labelText = block.label;
@@ -118,7 +139,15 @@ function BlockRenderer({
     case "text_input":
       return (
         <div className="space-y-1.5">
-          <RequiredLabel label={labelText} required={required} />
+          <div className="flex items-center gap-1">
+            <RequiredLabel label={labelText} required={required} />
+            {tokenGroups && tokenGroups.length > 0 && (
+              <TokenInsert
+                groups={tokenGroups}
+                onInsert={(token) => onChange(((value as string) ?? "") + token)}
+              />
+            )}
+          </div>
           <Input
             value={(value as string) ?? ""}
             onChange={(e) => onChange(e.target.value || null)}
@@ -130,7 +159,15 @@ function BlockRenderer({
     case "rich_text":
       return (
         <div className="space-y-1.5">
-          <RequiredLabel label={labelText} required={required} />
+          <div className="flex items-center gap-1">
+            <RequiredLabel label={labelText} required={required} />
+            {tokenGroups && tokenGroups.length > 0 && (
+              <TokenInsert
+                groups={tokenGroups}
+                onInsert={(token) => onChange(((value as string) ?? "") + token)}
+              />
+            )}
+          </div>
           <MentionTextarea
             value={(value as string) ?? ""}
             onChange={(v) => onChange(v || null)}

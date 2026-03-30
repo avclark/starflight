@@ -534,6 +534,8 @@ export interface Database {
           completed_at: string | null;
           completed_by: string | null;
           email_body_override: string | null;
+          hidden_template_block_ids: Json;
+          block_order: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -551,6 +553,8 @@ export interface Database {
           completed_at?: string | null;
           completed_by?: string | null;
           email_body_override?: string | null;
+          hidden_template_block_ids?: Json;
+          block_order?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -568,6 +572,8 @@ export interface Database {
           completed_at?: string | null;
           completed_by?: string | null;
           email_body_override?: string | null;
+          hidden_template_block_ids?: Json;
+          block_order?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -594,6 +600,39 @@ export interface Database {
           task_template_block_id?: string;
           value_json?: Json | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      task_instance_blocks: {
+        Row: {
+          id: string;
+          task_id: string;
+          block_type: "description" | "text_input" | "rich_text" | "dropdown" | "radio" | "checkbox" | "file_attachment" | "date_time" | "heading" | "comments";
+          label: string;
+          required: boolean;
+          options_json: Json | null;
+          display_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          task_id: string;
+          block_type: "description" | "text_input" | "rich_text" | "dropdown" | "radio" | "checkbox" | "file_attachment" | "date_time" | "heading" | "comments";
+          label: string;
+          required?: boolean;
+          options_json?: Json | null;
+          display_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          task_id?: string;
+          block_type?: "description" | "text_input" | "rich_text" | "dropdown" | "radio" | "checkbox" | "file_attachment" | "date_time" | "heading" | "comments";
+          label?: string;
+          required?: boolean;
+          options_json?: Json | null;
+          display_order?: number;
+          created_at?: string;
         };
         Relationships: [];
       };

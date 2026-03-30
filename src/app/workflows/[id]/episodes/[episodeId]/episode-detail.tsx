@@ -10,11 +10,13 @@ import {
   ChevronDown,
   ChevronRight,
   MoreHorizontal,
+  Plus,
   Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateTimePicker } from "@/components/date-time-picker";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -35,6 +37,9 @@ import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
 import { TaskFormBlocks, validateRequiredBlocks } from "./task-form-blocks";
 import { TaskComments } from "./task-comments";
+import { mergeBlocks, BlockActions, AddBlockButton, type MergedBlock } from "./episode-block-manager";
+import { buildTokenGroups } from "@/components/token-insert";
+import { renameTaskInEpisode, insertTaskInEpisode } from "@/lib/actions/instance-blocks";
 import {
   completeTask,
   uncompleteTask,
@@ -48,6 +53,7 @@ import type { Tables, Json } from "@/lib/types/database";
 
 type Task = Tables<"tasks">;
 type Block = Tables<"task_template_blocks">;
+type InstanceBlock = Tables<"task_instance_blocks">;
 type BlockResponse = Tables<"task_block_responses">;
 type Comment = Tables<"task_comments">;
 type EmailTpl = Tables<"task_template_email_templates">;
@@ -75,6 +81,9 @@ function TaskRow({
   allBlocks,
   allResponses,
   allTasks,
+  instanceBlocks,
+  allInstanceBlocks,
+  tokenGroups: tokenGroupsProp,
 }: {
   task: Task;
   workflowId: string;
@@ -92,6 +101,9 @@ function TaskRow({
   allBlocks: Block[];
   allResponses: BlockResponse[];
   allTasks: Task[];
+  instanceBlocks: InstanceBlock[];
+  allInstanceBlocks: InstanceBlock[];
+  tokenGroups: ReturnType<typeof buildTokenGroups>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -105,6 +117,15 @@ function TaskRow({
   );
   const [blockDraft, setBlockDraft] = useState<Record<string, Json | null>>({});
   const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
+  const [localTitle, setLocalTitle] = useState(task.title);
+  const [localBlockOrder, setLocalBlockOrder] = useState<string[] | null>(
+    Array.isArray(task.block_order) ? (task.block_order as string[]) : null
+  );
+
+  const hiddenIds = Array.isArray(task.hidden_template_block_ids)
+    ? (task.hidden_template_block_ids as string[])
+    : [];
+  const mergedBlocks = mergeBlocks(blocks, instanceBlocks, hiddenIds, localBlockOrder);
 
   const overdue = isOverdue(task.due_date, task.status);
   const effectiveStatus = optimisticStatus ?? task.status;
@@ -131,7 +152,7 @@ function TaskRow({
     }
 
     // Validate against the merged state (saved + draft) to check completeness
-    const errors = validateRequiredBlocks(blocks, blockDraft, responses);
+    const errors = validateRequiredBlocks(mergedBlocks, blockDraft, responses);
     if (errors.length > 0) {
       setValidationErrors(errors);
       return;
@@ -182,9 +203,9 @@ function TaskRow({
 
   return (
     <>
-      <div className="border-b last:border-b-0">
+      <div className="rounded-lg border bg-card">
         <div
-          className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 cursor-pointer"
+          className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 cursor-pointer rounded-t-lg"
           onClick={() => setExpanded(!expanded)}
         >
           <div onClick={(e) => e.stopPropagation()}>
@@ -203,17 +224,22 @@ function TaskRow({
             )}
           </div>
 
-          <span
-            className={`flex-1 text-sm ${
-              isCompleted
-                ? "line-through text-muted-foreground"
-                : isBlocked
-                ? "text-muted-foreground"
-                : ""
-            }`}
-          >
-            {task.title}
-          </span>
+          <div className="flex-1 min-w-0">
+            <InlineEdit
+              value={localTitle}
+              onSave={async (newTitle) => {
+                setLocalTitle(newTitle);
+                await renameTaskInEpisode(task.id, episodeId, workflowId, newTitle);
+              }}
+              className={`text-sm font-medium ${
+                isCompleted
+                  ? "line-through text-muted-foreground"
+                  : isBlocked
+                  ? "text-muted-foreground"
+                  : ""
+              }`}
+            />
+          </div>
 
           {assignedName && (
             <Badge variant="outline" className="text-xs font-normal">
@@ -264,7 +290,7 @@ function TaskRow({
         </div>
 
         {expanded && (
-          <div className="px-4 pb-4 pt-1 ml-12 space-y-4 border-t bg-muted/30">
+          <div className="px-4 pb-4 pt-1 ml-12 space-y-4 border-t bg-muted/30 rounded-b-lg">
             <div className="grid gap-4 sm:grid-cols-2 pt-3">
               <div className="space-y-2">
                 <Label>Start Date</Label>
@@ -284,20 +310,39 @@ function TaskRow({
               </div>
             </div>
 
-            {blocks.length > 0 && (
+            {mergedBlocks.length > 0 && (
               <>
                 <Separator />
                 <TaskFormBlocks
-                  blocks={blocks}
+                  blocks={mergedBlocks}
                   responses={responses}
                   draft={blockDraft}
                   onUpdate={(blockId, value) =>
                     setBlockDraft((prev) => ({ ...prev, [blockId]: value }))
                   }
                   people={people}
+                  tokenGroups={tokenGroupsProp}
+                  blockActions={(block, index) => (
+                    <BlockActions
+                      block={block as MergedBlock}
+                      index={index}
+                      totalCount={mergedBlocks.length}
+                      taskId={task.id}
+                      episodeId={episodeId}
+                      workflowId={workflowId}
+                      allBlocks={mergedBlocks}
+                      onReorder={(newOrder) => setLocalBlockOrder(newOrder)}
+                    />
+                  )}
                 />
               </>
             )}
+
+            <AddBlockButton
+              taskId={task.id}
+              episodeId={episodeId}
+              workflowId={workflowId}
+            />
 
             {validationErrors.length > 0 && (
               <p className="text-sm text-destructive">
@@ -332,6 +377,7 @@ function TaskRow({
                   allBlocks={allBlocks}
                   allResponses={allResponses}
                   allTasks={allTasks}
+                  allInstanceBlocks={allInstanceBlocks}
                   taskId={task.id}
                   episodeId={episodeId}
                   workflowId={workflowId}
@@ -340,7 +386,7 @@ function TaskRow({
               </>
             )}
 
-            {blocks.some((b) => b.block_type === "comments") && (
+            {mergedBlocks.some((b) => b.block_type === "comments") && (
               <>
                 <Separator />
                 <TaskComments
@@ -391,6 +437,7 @@ export function EpisodeDetail({
   people = [],
   emailTemplates = [],
   showSettingsMap = {},
+  instanceBlocks = [],
 }: {
   workflowId: string;
   episode: {
@@ -408,7 +455,31 @@ export function EpisodeDetail({
   people?: Person[];
   emailTemplates?: EmailTpl[];
   showSettingsMap?: Record<string, string>;
+  instanceBlocks?: InstanceBlock[];
 }) {
+  // Build token groups for the token insert feature
+  const settingDefs = Object.keys(showSettingsMap).map((label, i) => ({
+    id: `sd-${i}`,
+    label,
+  }));
+  const templateIdToTitle = new Map(
+    tasks.map((t) => [t.task_template_id, t.title])
+  );
+  const tokenTemplates = [...templateIdToTitle.entries()].map(([id, title]) => ({
+    id,
+    title,
+  }));
+  const tokenGroups = buildTokenGroups({
+    settingDefinitions: settingDefs,
+    templates: tokenTemplates,
+    blocks: templateBlocks.map((b) => ({
+      task_template_id: b.task_template_id,
+      label: b.label,
+      block_type: b.block_type,
+      token_name: b.token_name,
+    })),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -450,13 +521,42 @@ export function EpisodeDetail({
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="space-y-0">
         {tasks.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
+          <div className="text-center text-muted-foreground py-8 rounded-md border">
             No tasks in this episode.
           </div>
         ) : (
-          tasks.map((task) => (
+          tasks.map((task, taskIndex) => (
+            <div key={task.id}>
+              {taskIndex > 0 && (
+                <>
+                  <div className="flex items-center justify-center py-1">
+                    <div className="h-4 w-px bg-border" />
+                  </div>
+                  <div className="flex items-center justify-center -my-1 relative z-10">
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="h-6 w-6 rounded-full bg-background"
+                      onClick={() =>
+                        insertTaskInEpisode(
+                          episode.id,
+                          workflowId,
+                          "New Task",
+                          task.position,
+                          task.task_template_id
+                        )
+                      }
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-center py-1">
+                    <div className="h-4 w-px bg-border" />
+                  </div>
+                </>
+              )}
             <TaskRow
               key={task.id}
               task={task}
@@ -487,7 +587,13 @@ export function EpisodeDetail({
               allBlocks={templateBlocks}
               allResponses={blockResponses}
               allTasks={tasks}
+              instanceBlocks={instanceBlocks.filter(
+                (b) => b.task_id === task.id
+              )}
+              allInstanceBlocks={instanceBlocks}
+              tokenGroups={tokenGroups}
             />
+            </div>
           ))
         )}
       </div>

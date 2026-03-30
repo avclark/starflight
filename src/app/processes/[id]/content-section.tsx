@@ -1,7 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Copy, Plus, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowDownToLine,
+  ArrowUp,
+  ArrowUpToLine,
+  Copy,
+  MoreHorizontal,
+  Plus,
+  Settings,
+  Trash2,
+  X,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -112,6 +136,204 @@ function OptionsEditor({
   );
 }
 
+function BlockPreview({ block }: { block: DraftBlock }) {
+  switch (block.block_type) {
+    case "heading":
+      return <h3 className="text-sm font-semibold">{block.label || "Heading"}</h3>;
+    case "description":
+      return <p className="text-sm text-muted-foreground">{block.label || "Description"}</p>;
+    case "comments":
+      return <p className="text-sm text-muted-foreground italic">Comments section</p>;
+    case "text_input":
+      return (
+        <div className="space-y-1">
+          <Label className="text-sm">{block.label || "Text Input"}{block.required && <span className="text-destructive ml-0.5">*</span>}</Label>
+          <Input disabled placeholder="Text input" className="max-w-md h-8 text-sm" />
+        </div>
+      );
+    case "rich_text":
+      return (
+        <div className="space-y-1">
+          <Label className="text-sm">{block.label || "Rich Text"}{block.required && <span className="text-destructive ml-0.5">*</span>}</Label>
+          <div className="rounded-md border border-input h-16 max-w-md bg-muted/30" />
+        </div>
+      );
+    case "dropdown": {
+      const opts = Array.isArray(block.options_json) ? (block.options_json as string[]) : [];
+      return (
+        <div className="space-y-1">
+          <Label className="text-sm">{block.label || "Dropdown"}{block.required && <span className="text-destructive ml-0.5">*</span>}</Label>
+          <Select disabled><SelectTrigger className="max-w-md h-8 text-sm"><SelectValue placeholder={opts[0] || "Select..."} /></SelectTrigger></Select>
+        </div>
+      );
+    }
+    case "radio": {
+      const opts = Array.isArray(block.options_json) ? (block.options_json as string[]) : [];
+      return (
+        <div className="space-y-1">
+          <Label className="text-sm">{block.label || "Radio"}{block.required && <span className="text-destructive ml-0.5">*</span>}</Label>
+          <div className="space-y-0.5">
+            {opts.map((o) => (
+              <label key={o} className="flex items-center gap-2 text-sm"><input type="radio" disabled className="accent-primary" />{o}</label>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    case "checkbox": {
+      const opts = Array.isArray(block.options_json) ? (block.options_json as string[]) : [];
+      return (
+        <div className="space-y-1">
+          <Label className="text-sm">{block.label || "Checkbox"}{block.required && <span className="text-destructive ml-0.5">*</span>}</Label>
+          <div className="space-y-0.5">
+            {opts.map((o) => (
+              <label key={o} className="flex items-center gap-2 text-sm"><Checkbox disabled />{o}</label>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    case "date_time":
+      return (
+        <div className="space-y-1">
+          <Label className="text-sm">{block.label || "Date & Time"}{block.required && <span className="text-destructive ml-0.5">*</span>}</Label>
+          <Button disabled variant="outline" className="max-w-md w-full justify-start text-left text-sm h-8">Pick date & time</Button>
+        </div>
+      );
+    case "file_attachment":
+      return (
+        <div className="space-y-1">
+          <Label className="text-sm">{block.label || "File Attachment"}{block.required && <span className="text-destructive ml-0.5">*</span>}</Label>
+          <div className="rounded-md border border-dashed border-input h-12 max-w-md flex items-center justify-center text-xs text-muted-foreground">Paste URL or file path</div>
+        </div>
+      );
+    default:
+      return <p className="text-xs text-muted-foreground">{block.block_type}</p>;
+  }
+}
+
+function ProcessBlockCard({
+  block,
+  index,
+  total,
+  onUpdate,
+  onMove,
+  onDuplicate,
+  onRemove,
+  autoOpenSettings = false,
+  onSettingsClosed,
+}: {
+  block: DraftBlock;
+  index: number;
+  total: number;
+  onUpdate: (patch: Partial<DraftBlock>) => void;
+  onMove: (dir: "up" | "down" | "top" | "bottom") => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+  autoOpenSettings?: boolean;
+  onSettingsClosed?: () => void;
+}) {
+  const [settingsOpen, setSettingsOpen] = useState(autoOpenSettings);
+
+  return (
+    <>
+      <div className="rounded border p-3 bg-background flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <BlockPreview block={block} />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="h-6 w-6 shrink-0">
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+              <Settings className="mr-2 h-3.5 w-3.5" />
+              Block Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={index === 0} onClick={() => onMove("top")}>
+              <ArrowUpToLine className="mr-2 h-3.5 w-3.5" />
+              Send to Top
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={index === 0} onClick={() => onMove("up")}>
+              <ArrowUp className="mr-2 h-3.5 w-3.5" />
+              Move Up
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={index === total - 1} onClick={() => onMove("down")}>
+              <ArrowDown className="mr-2 h-3.5 w-3.5" />
+              Move Down
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={index === total - 1} onClick={() => onMove("bottom")}>
+              <ArrowDownToLine className="mr-2 h-3.5 w-3.5" />
+              Send to Bottom
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onDuplicate}>
+              <Copy className="mr-2 h-3.5 w-3.5" />
+              Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={onRemove}>
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              Delete Block
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <Dialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) onSettingsClosed?.(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Block Settings</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Label</Label>
+              <Input
+                value={block.label}
+                onChange={(e) => onUpdate({ label: e.target.value })}
+                placeholder={
+                  block.block_type === "heading" ? "Heading text" :
+                  block.block_type === "description" ? "Description text" : "Label"
+                }
+              />
+            </div>
+            {block.block_type !== "heading" && block.block_type !== "description" && block.block_type !== "comments" && (
+              <>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={block.required}
+                    onCheckedChange={(c) => onUpdate({ required: !!c })}
+                  />
+                  Required
+                </label>
+                <div className="space-y-2">
+                  <Label className="text-xs">Token name (optional)</Label>
+                  <Input
+                    value={block.token_name ?? ""}
+                    onChange={(e) => onUpdate({ token_name: e.target.value || null })}
+                    placeholder="e.g. client_notes"
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </>
+            )}
+            {NEEDS_OPTIONS.has(block.block_type) && (
+              <OptionsEditor
+                options={Array.isArray(block.options_json) ? (block.options_json as string[]) : []}
+                onChange={(opts) => onUpdate({ options_json: opts })}
+              />
+            )}
+            <div className="flex justify-end">
+              <Button onClick={() => setSettingsOpen(false)}>Done</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export function ContentSection({
   taskTemplateId,
   processId,
@@ -136,12 +358,14 @@ export function ContentSection({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [addType, setAddType] = useState<string | null>(null);
+  const [newBlockKey, setNewBlockKey] = useState<string | null>(null);
 
   function addBlock(type: string) {
+    const key = crypto.randomUUID();
     setBlocks((prev) => [
       ...prev,
       {
-        key: crypto.randomUUID(),
+        key,
         block_type: type,
         label: "",
         required: false,
@@ -150,6 +374,7 @@ export function ContentSection({
       },
     ]);
     setAddType(null);
+    setNewBlockKey(key);
   }
 
   function updateBlock(key: string, patch: Partial<DraftBlock>) {
@@ -173,14 +398,18 @@ export function ContentSection({
     });
   }
 
-  function moveBlock(key: string, dir: -1 | 1) {
+  function moveBlock(key: string, dir: "up" | "down" | "top" | "bottom") {
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.key === key);
       if (idx === -1) return prev;
-      const newIdx = idx + dir;
-      if (newIdx < 0 || newIdx >= prev.length) return prev;
       const next = [...prev];
-      [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+      const [item] = next.splice(idx, 1);
+      switch (dir) {
+        case "up": next.splice(Math.max(0, idx - 1), 0, item); break;
+        case "down": next.splice(Math.min(next.length, idx + 1), 0, item); break;
+        case "top": next.unshift(item); break;
+        case "bottom": next.push(item); break;
+      }
       return next;
     });
   }
@@ -212,108 +441,20 @@ export function ContentSection({
         </p>
       )}
 
-      {blocks.map((block, i) => {
-        const typeLabel =
-          BLOCK_TYPES.find((bt) => bt.value === block.block_type)?.label ??
-          block.block_type;
-
-        return (
-          <div key={block.key} className="rounded border p-3 space-y-2 bg-background">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                {typeLabel}
-              </span>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="h-6 w-6"
-                disabled={i === 0}
-                onClick={() => moveBlock(block.key, -1)}
-              >
-                <ArrowUp className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="h-6 w-6"
-                disabled={i === blocks.length - 1}
-                onClick={() => moveBlock(block.key, 1)}
-              >
-                <ArrowDown className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="h-6 w-6"
-                onClick={() => duplicateBlock(block.key)}
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="h-6 w-6"
-                onClick={() => removeBlock(block.key)}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-
-            <Input
-              value={block.label}
-              onChange={(e) => updateBlock(block.key, { label: e.target.value })}
-              placeholder={
-                block.block_type === "heading"
-                  ? "Heading text"
-                  : block.block_type === "description"
-                  ? "Description text"
-                  : "Label"
-              }
-              className="h-7 text-sm"
-            />
-
-            {block.block_type !== "heading" &&
-              block.block_type !== "description" &&
-              block.block_type !== "comments" && (
-                <>
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                    <Checkbox
-                      checked={block.required}
-                      onCheckedChange={(checked) =>
-                        updateBlock(block.key, { required: !!checked })
-                      }
-                    />
-                    Required
-                  </label>
-                  <Input
-                    value={block.token_name ?? ""}
-                    onChange={(e) =>
-                      updateBlock(block.key, {
-                        token_name: e.target.value || null,
-                      })
-                    }
-                    placeholder="Token name (optional, e.g. client_notes)"
-                    className="h-7 text-xs max-w-xs"
-                  />
-                </>
-              )}
-
-            {NEEDS_OPTIONS.has(block.block_type) && (
-              <OptionsEditor
-                options={
-                  Array.isArray(block.options_json)
-                    ? (block.options_json as string[])
-                    : []
-                }
-                onChange={(opts) =>
-                  updateBlock(block.key, { options_json: opts })
-                }
-              />
-            )}
-          </div>
-        );
-      })}
+      {blocks.map((block, i) => (
+        <ProcessBlockCard
+          key={block.key}
+          block={block}
+          index={i}
+          total={blocks.length}
+          onUpdate={(patch) => updateBlock(block.key, patch)}
+          onMove={(dir: "up" | "down" | "top" | "bottom") => moveBlock(block.key, dir)}
+          onDuplicate={() => duplicateBlock(block.key)}
+          onRemove={() => removeBlock(block.key)}
+          autoOpenSettings={block.key === newBlockKey}
+          onSettingsClosed={() => { if (block.key === newBlockKey) setNewBlockKey(null); }}
+        />
+      ))}
 
       <div className="flex items-center gap-2">
         <Select

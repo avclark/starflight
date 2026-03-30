@@ -98,6 +98,8 @@ function resolveTokens(text: string, ctx: TokenContext): string {
   return result;
 }
 
+type InstanceBlockRow = { id: string; task_id: string; block_type: string; label: string; token_name?: string | null };
+
 export function EmailPreview({
   emailTemplate,
   episodeTitle,
@@ -106,6 +108,7 @@ export function EmailPreview({
   allBlocks,
   allResponses,
   allTasks,
+  allInstanceBlocks = [],
   taskId,
   episodeId,
   workflowId,
@@ -118,6 +121,7 @@ export function EmailPreview({
   allBlocks: Block[];
   allResponses: BlockResponse[];
   allTasks: Task[];
+  allInstanceBlocks?: InstanceBlockRow[];
   taskId: string;
   episodeId: string;
   workflowId: string;
@@ -127,9 +131,12 @@ export function EmailPreview({
   const [draftBody, setDraftBody] = useState(emailBodyOverride ?? "");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Build task title map (template_id → task title)
+  // Build task title maps
   const taskTitleByTemplateId = new Map(
     allTasks.map((t) => [t.task_template_id, t.title])
+  );
+  const taskTitleByTaskId = new Map(
+    allTasks.map((t) => [t.id, t.title])
   );
 
   // Build response map: block_id → value
@@ -141,6 +148,7 @@ export function EmailPreview({
   const taskBlockValues = new Map<string, string>();
   const customTokenValues = new Map<string, string>();
 
+  // Template blocks
   for (const block of allBlocks) {
     if (block.block_type === "heading" || block.block_type === "description" || block.block_type === "comments") continue;
 
@@ -148,12 +156,23 @@ export function EmailPreview({
     const val = formatValue(responseByBlockId.get(block.id));
 
     if (taskTitle && block.label) {
-      taskBlockValues.set(
-        normalize(`${taskTitle}.${block.label}`),
-        val
-      );
+      taskBlockValues.set(normalize(`${taskTitle}.${block.label}`), val);
     }
+    if (block.token_name) {
+      customTokenValues.set(normalize(block.token_name), val);
+    }
+  }
 
+  // Instance blocks
+  for (const block of allInstanceBlocks) {
+    if (block.block_type === "heading" || block.block_type === "description" || block.block_type === "comments") continue;
+
+    const taskTitle = taskTitleByTaskId.get(block.task_id);
+    const val = formatValue(responseByBlockId.get(block.id));
+
+    if (taskTitle && block.label) {
+      taskBlockValues.set(normalize(`${taskTitle}.${block.label}`), val);
+    }
     if (block.token_name) {
       customTokenValues.set(normalize(block.token_name), val);
     }

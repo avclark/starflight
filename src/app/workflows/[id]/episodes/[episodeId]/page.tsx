@@ -61,8 +61,17 @@ export default async function EpisodeDetailPage({
         .order("display_order")
     : { data: [] };
 
-  // Fetch existing block responses for all tasks
+  // Fetch instance blocks (episode-level blocks added to tasks)
   const taskIds = (tasks ?? []).map((t) => t.id);
+  const { data: instanceBlocks } = taskIds.length
+    ? await supabase
+        .from("task_instance_blocks")
+        .select("*")
+        .in("task_id", taskIds)
+        .order("display_order")
+    : { data: [] };
+
+  // Fetch existing block responses for all tasks
   const { data: blockResponses } = taskIds.length
     ? await supabase
         .from("task_block_responses")
@@ -150,6 +159,7 @@ export default async function EpisodeDetailPage({
       people={allPeople ?? []}
       emailTemplates={emailTemplates ?? []}
       showSettingsMap={showSettingsMap}
+      instanceBlocks={instanceBlocks ?? []}
     />
   );
 }
