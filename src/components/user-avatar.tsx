@@ -62,9 +62,9 @@ export function UserAvatar({
   }
 
   return (
-    <div
+    <span
       className={cn(
-        "rounded-full flex items-center justify-center font-medium shrink-0",
+        "rounded-full inline-flex items-center justify-center font-medium shrink-0",
         sizeClasses[size],
         getColorFromName(name),
         className
@@ -72,6 +72,6 @@ export function UserAvatar({
       title={name}
     >
       {getInitials(name)}
-    </div>
+    </span>
   );
 }

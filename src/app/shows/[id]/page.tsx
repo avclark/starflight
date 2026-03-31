@@ -85,7 +85,7 @@ export default async function ShowDetailPage({
 
   return (
     <div className="space-y-6">
-      <ShowHeader showId={id} name={show.name} />
+      <ShowHeader showId={id} name={show.name} avatarUrl={show.avatar_url} />
 
       <Tabs defaultValue="settings">
         <TabsList>

@@ -4,6 +4,7 @@ import { DashboardTasks } from "./dashboard-tasks";
 import { UserSwitcher } from "./user-switcher";
 import Link from "next/link";
 import { ClientDate } from "@/components/client-date";
+import { ShowAvatar } from "@/components/show-avatar";
 import type { Tables } from "@/lib/types/database";
 
 export default async function DashboardPage({
@@ -58,13 +59,14 @@ export default async function DashboardPage({
   const workflowIds = [...new Set((episodes ?? []).map((e) => e.workflow_id))];
 
   const { data: shows } = showIds.length
-    ? await supabase.from("shows").select("id, name").in("id", showIds)
+    ? await supabase.from("shows").select("id, name, avatar_url").in("id", showIds)
     : { data: [] };
   const { data: workflows } = workflowIds.length
     ? await supabase.from("workflows").select("id, name").in("id", workflowIds)
     : { data: [] };
 
   const showMap = new Map((shows ?? []).map((s) => [s.id, s.name]));
+  const showAvatarMap = new Map((shows ?? []).map((s) => [s.id, s.avatar_url]));
   const workflowMap = new Map((workflows ?? []).map((w) => [w.id, w.name]));
 
   // Fetch tasks — filtered by user if set
@@ -122,7 +124,8 @@ export default async function DashboardPage({
                       <p className="text-sm font-medium truncate">
                         {ep.title}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                        <ShowAvatar name={showMap.get(ep.show_id) ?? ""} avatarUrl={showAvatarMap.get(ep.show_id)} size="xs" />
                         {showMap.get(ep.show_id) ?? "Unknown show"}
                         {workflowMap.has(ep.workflow_id)
                           ? ` · ${workflowMap.get(ep.workflow_id)}`

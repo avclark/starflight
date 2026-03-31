@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { ShowAvatar } from "@/components/show-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -108,8 +109,9 @@ export function ShowsTable({ shows }: { shows: Tables<"shows">[] }) {
                   <TableCell>
                     <Link
                       href={`/shows/${show.id}`}
-                      className="font-medium hover:underline"
+                      className="font-medium hover:underline flex items-center gap-2"
                     >
+                      <ShowAvatar name={show.name} avatarUrl={show.avatar_url} size="sm" />
                       {show.name}
                     </Link>
                   </TableCell>

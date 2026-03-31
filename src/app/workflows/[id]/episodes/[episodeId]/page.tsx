@@ -20,7 +20,7 @@ export default async function EpisodeDetailPage({
 
   const { data: show } = await supabase
     .from("shows")
-    .select("name")
+    .select("name, avatar_url")
     .eq("id", episode.show_id)
     .single();
 
@@ -184,6 +184,7 @@ export default async function EpisodeDetailPage({
         status: episode.status,
         progress_percent: episode.progress_percent,
         show_name: show?.name ?? null,
+        show_avatar_url: show?.avatar_url ?? null,
       }}
       tasks={tasks ?? []}
       userMap={fullUserMap}

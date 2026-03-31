@@ -6,7 +6,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateTimePicker } from "@/components/date-time-picker";
+import { FileUpload } from "@/components/file-upload";
 import { MentionTextarea } from "@/components/mention-textarea";
+import { uploadFile } from "@/lib/storage";
 import {
   Select,
   SelectContent,
@@ -40,6 +42,7 @@ export function TaskFormBlocks({
   blockActions,
   tokenGroups,
   onBlockReorder,
+  taskId,
 }: {
   blocks: Block[];
   responses: Response[];
@@ -49,6 +52,7 @@ export function TaskFormBlocks({
   blockActions?: (block: Block, index: number) => React.ReactNode;
   tokenGroups?: TokenGroup[];
   onBlockReorder?: (oldIndex: number, newIndex: number) => void;
+  taskId?: string;
 }) {
   const responseMap = new Map<string, Json | null>();
   for (const r of responses) {
@@ -76,6 +80,7 @@ export function TaskFormBlocks({
             onChange={(val) => onUpdate(block.id, val)}
             people={people}
             tokenGroups={tokenGroups}
+            taskId={taskId}
           />
         </div>
         {blockActions?.(block, index)}
@@ -150,12 +155,14 @@ function BlockRenderer({
   onChange,
   people,
   tokenGroups,
+  taskId,
 }: {
   block: Block;
   value: Json | null;
   onChange: (val: Json | null) => void;
   people: Person[];
   tokenGroups?: TokenGroup[];
+  taskId?: string;
 }) {
   const required = block.required;
   const labelText = block.label;
@@ -209,18 +216,39 @@ function BlockRenderer({
         </div>
       );
 
-    case "file_attachment":
+    case "file_attachment": {
+      const fileUrl = value ? String(value) : null;
+      const fileName = fileUrl ? fileUrl.split("/").pop() ?? "file" : null;
       return (
         <div className="space-y-1.5">
           <RequiredLabel label={labelText} required={required} />
-          <Textarea
-            value={(value as string) ?? ""}
-            onChange={(e) => onChange(e.target.value || null)}
-            placeholder="Paste URL or file path"
-            className="max-w-md"
-          />
+          {taskId ? (
+            <FileUpload
+              maxSizeMB={10}
+              currentUrl={fileUrl}
+              currentFileName={fileName}
+              label="Upload file"
+              onUpload={async (file) => {
+                const path = `${taskId}/${block.id}/${file.name}`;
+                const result = await uploadFile("task-attachments", path, file, { maxSizeMB: 10 });
+                if (result.url) {
+                  onChange(result.url);
+                }
+                return result;
+              }}
+              onRemove={() => onChange(null)}
+            />
+          ) : (
+            <Input
+              value={(value as string) ?? ""}
+              onChange={(e) => onChange(e.target.value || null)}
+              placeholder="File URL"
+              className="max-w-md"
+            />
+          )}
         </div>
       );
+    }
 
     case "dropdown":
       return (

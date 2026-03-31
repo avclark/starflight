@@ -39,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ShowAvatar } from "@/components/show-avatar";
 import { createEpisode, deleteEpisode } from "@/lib/actions/episodes";
 
 type Episode = {
@@ -48,11 +49,13 @@ type Episode = {
   progress_percent: number;
   updated_at: string;
   show_name: string | null;
+  show_avatar_url: string | null;
 };
 
 type Show = {
   id: string;
   name: string;
+  avatar_url: string | null;
 };
 
 export function EpisodesTab({
@@ -135,7 +138,10 @@ export function EpisodesTab({
                   <SelectContent>
                     {shows.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name}
+                        <span className="flex items-center gap-1.5">
+                          <ShowAvatar name={s.name} avatarUrl={s.avatar_url} size="xs" />
+                          {s.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -193,7 +199,10 @@ export function EpisodesTab({
                     </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {ep.show_name ?? "—"}
+                    <span className="flex items-center gap-1.5">
+                      <ShowAvatar name={ep.show_name ?? ""} avatarUrl={ep.show_avatar_url} size="xs" />
+                      {ep.show_name ?? "—"}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

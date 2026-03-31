@@ -50,6 +50,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
+import { ShowAvatar } from "@/components/show-avatar";
 import { UserAvatar } from "@/components/user-avatar";
 import { SortableList, SortableItem, DragHandle, arrayMove } from "@/components/sortable-list";
 import { InsertTaskButton } from "@/components/insert-task-button";
@@ -491,6 +492,7 @@ function TaskRow({
                     blocks={mergedBlocks}
                     responses={responses}
                     draft={blockDraft}
+                    taskId={task.id}
                     onUpdate={(blockId, value) =>
                       setBlockDraft((prev) => ({ ...prev, [blockId]: value }))
                     }
@@ -1147,6 +1149,7 @@ export function EpisodeDetail({
     status: "active" | "completed" | "archived";
     progress_percent: number;
     show_name: string | null;
+    show_avatar_url: string | null;
   };
   tasks: Task[];
   userMap?: Record<string, string>;
@@ -1225,7 +1228,8 @@ export function EpisodeDetail({
               await renameEpisode(episode.id, workflowId, newTitle);
             }}
           />
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <ShowAvatar name={episode.show_name ?? ""} avatarUrl={episode.show_avatar_url} size="xs" />
             {episode.show_name ?? "Unknown show"}
           </p>
         </div>

@@ -28,13 +28,14 @@ export default async function WorkflowDetailPage({
   // Fetch show names for episodes
   const showIds = [...new Set((episodes ?? []).map((e) => e.show_id))];
   const { data: episodeShows } = showIds.length
-    ? await supabase.from("shows").select("id, name").in("id", showIds)
+    ? await supabase.from("shows").select("id, name, avatar_url").in("id", showIds)
     : { data: [] };
   const showNameMap = new Map((episodeShows ?? []).map((s) => [s.id, s.name]));
+  const showAvatarMap = new Map((episodeShows ?? []).map((s) => [s.id, s.avatar_url]));
 
   const { data: shows } = await supabase
     .from("shows")
-    .select("id, name")
+    .select("id, name, avatar_url")
     .eq("status", "active")
     .order("name");
 
@@ -50,6 +51,7 @@ export default async function WorkflowDetailPage({
   const episodesWithShows = (episodes ?? []).map((ep) => ({
     ...ep,
     show_name: showNameMap.get(ep.show_id) ?? null,
+    show_avatar_url: showAvatarMap.get(ep.show_id) ?? null,
   }));
 
   return (

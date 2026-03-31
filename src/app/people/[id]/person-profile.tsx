@@ -14,8 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FileUpload } from "@/components/file-upload";
 import { UserAvatar } from "@/components/user-avatar";
 import { updatePerson } from "@/lib/actions/people";
+import { uploadFile, ACCEPTED_IMAGE_TYPES } from "@/lib/storage";
 import type { Tables } from "@/lib/types/database";
 
 const TIMEZONES: { value: string; label: string; offset: number }[] = [
@@ -74,6 +76,7 @@ export function PersonProfile({
   );
   const [email, setEmail] = useState(person.email);
   const [timezone, setTimezone] = useState(person.timezone ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(person.avatar_url);
   const [saving, setSaving] = useState(false);
 
   const displayName = `${firstName} ${lastName}`.trim();
@@ -104,7 +107,7 @@ export function PersonProfile({
         </Link>
         <UserAvatar
           name={displayName || person.email}
-          avatarUrl={person.avatar_url}
+          avatarUrl={avatarUrl}
           size="lg"
         />
         <div>
@@ -167,9 +170,40 @@ export function PersonProfile({
 
         <div className="space-y-2">
           <Label>Avatar</Label>
-          <p className="text-sm text-muted-foreground">
-            Avatar upload coming in a future update.
-          </p>
+          <div className="flex items-center gap-4">
+            <UserAvatar
+              name={displayName || person.email}
+              avatarUrl={avatarUrl}
+              size="lg"
+            />
+            <FileUpload
+              accept="image/png,image/jpeg,image/webp"
+              maxSizeMB={1}
+              currentUrl={avatarUrl}
+              label="Upload avatar"
+              onUpload={async (file) => {
+                const ext = file.name.split(".").pop() ?? "jpg";
+                const result = await uploadFile(
+                  "avatars",
+                  `${person.id}.${ext}`,
+                  file,
+                  { maxSizeMB: 1, acceptedTypes: ACCEPTED_IMAGE_TYPES }
+                );
+                if (result.url) {
+                  setAvatarUrl(result.url);
+                  // Save immediately
+                  const { createClient } = await import("@/lib/supabase/client");
+                  const supabase = createClient();
+                  await supabase
+                    .from("users")
+                    .update({ avatar_url: result.url })
+                    .eq("id", person.id);
+                  toast("Avatar uploaded");
+                }
+                return result;
+              }}
+            />
+          </div>
         </div>
 
         <Button onClick={handleSave} disabled={saving}>
