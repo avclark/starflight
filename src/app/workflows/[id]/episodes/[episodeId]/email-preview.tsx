@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Mail, Send } from "lucide-react";
+import { Braces, Copy, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { completeTask } from "@/lib/actions/episodes";
@@ -41,7 +46,8 @@ function LinkifiedText({ text }: { text: string }) {
 }
 
 function normalize(s: string): string {
-  return s.toLowerCase().replace(/_/g, " ").trim();
+  // Normalize for matching: lowercase, underscores→spaces, collapse whitespace
+  return s.toLowerCase().replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function formatValue(val: Json | null | undefined): string {
@@ -82,12 +88,12 @@ function resolveTokens(text: string, ctx: TokenContext): string {
   result = result.replace(/\{\{([^}]+)\}\}/gi, (match, token) => {
     const key = normalize(token);
 
-    // Check custom token names first
+    // Check custom token names first (exact normalized match)
     if (ctx.customTokenValues.has(key)) {
       return ctx.customTokenValues.get(key)!;
     }
 
-    // Check namespaced task.block tokens
+    // Check namespaced task.block tokens (exact normalized match)
     if (ctx.taskBlockValues.has(key)) {
       return ctx.taskBlockValues.get(key)!;
     }
@@ -113,6 +119,7 @@ export function EmailPreview({
   episodeId,
   workflowId,
   emailBodyOverride,
+  tokenGroups = [],
 }: {
   emailTemplate: EmailTemplate;
   episodeTitle: string;
@@ -126,9 +133,10 @@ export function EmailPreview({
   episodeId: string;
   workflowId: string;
   emailBodyOverride: string | null;
+  tokenGroups?: { label: string; tokens: { token: string; display: string }[] }[];
 }) {
   const [editing, setEditing] = useState(false);
-  const [draftBody, setDraftBody] = useState(emailBodyOverride ?? "");
+  const [draftBody, setDraftBody] = useState(emailBodyOverride ?? emailTemplate.body_template);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Build task title maps
@@ -140,9 +148,19 @@ export function EmailPreview({
   );
 
   // Build response map: block_id → value
-  const responseByBlockId = new Map(
-    allResponses.map((r) => [r.task_template_block_id, r.value_json])
-  );
+  // Key by ALL possible block ID fields so both template and instance responses are found
+  const responseByBlockId = new Map<string, Json | null>();
+  for (const r of allResponses) {
+    // Template block responses
+    if (r.task_template_block_id) {
+      responseByBlockId.set(r.task_template_block_id, r.value_json);
+    }
+    // Instance block responses (column may or may not exist depending on migration)
+    const raw = r as Record<string, unknown>;
+    if (raw.task_instance_block_id && typeof raw.task_instance_block_id === "string") {
+      responseByBlockId.set(raw.task_instance_block_id, r.value_json);
+    }
+  }
 
   // Build token context
   const taskBlockValues = new Map<string, string>();
@@ -163,12 +181,26 @@ export function EmailPreview({
     }
   }
 
-  // Instance blocks
+  // Instance blocks — look up responses by instance block ID
+  // Also do a direct scan of allResponses as fallback for cases where the
+  // response was saved with the instance block ID in the template column
+  // (before migration 00013 separated the columns)
   for (const block of allInstanceBlocks) {
     if (block.block_type === "heading" || block.block_type === "description" || block.block_type === "comments") continue;
 
     const taskTitle = taskTitleByTaskId.get(block.task_id);
-    const val = formatValue(responseByBlockId.get(block.id));
+    let val = formatValue(responseByBlockId.get(block.id));
+
+    // Fallback: scan responses directly for this block ID in either column
+    if (!val) {
+      for (const r of allResponses) {
+        const raw = r as Record<string, unknown>;
+        if (r.task_template_block_id === block.id || raw.task_instance_block_id === block.id) {
+          val = formatValue(r.value_json);
+          break;
+        }
+      }
+    }
 
     if (taskTitle && block.label) {
       taskBlockValues.set(normalize(`${taskTitle}.${block.label}`), val);
@@ -187,11 +219,14 @@ export function EmailPreview({
   };
 
   const resolvedSubject = resolveTokens(emailTemplate.subject_template, ctx);
-  const resolvedTemplateBody = resolveTokens(emailTemplate.body_template, ctx);
-  const displayBody = emailBodyOverride ?? resolvedTemplateBody;
+  // The "source" template text — either the override (with tokens) or the original template
+  const templateBody = emailBodyOverride ?? emailTemplate.body_template;
+  // Always resolve tokens dynamically for display
+  const resolvedBody = resolveTokens(templateBody, ctx);
 
   async function handleSaveEdit() {
     setSavingEdit(true);
+    // Save the TEMPLATE text with tokens intact, not the resolved output
     await saveEmailBodyOverride(taskId, episodeId, workflowId, draftBody || null);
     setSavingEdit(false);
     setEditing(false);
@@ -199,7 +234,8 @@ export function EmailPreview({
   }
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(editing ? draftBody : displayBody);
+    // Copy the RESOLVED version (for pasting into an actual email)
+    await navigator.clipboard.writeText(resolvedBody);
     toast("Message body copied to clipboard");
   }
 
@@ -207,7 +243,7 @@ export function EmailPreview({
     console.log("Email sent:", {
       from: emailTemplate.from_name,
       subject: resolvedSubject,
-      body: editing ? draftBody : displayBody,
+      body: resolvedBody,
     });
     toast("Email sent");
   }
@@ -244,10 +280,13 @@ export function EmailPreview({
 
       {editing ? (
         <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Edit the template text below. Use {"{{tokens}}"} for dynamic values.
+          </p>
           <Textarea
             value={draftBody}
             onChange={(e) => setDraftBody(e.target.value)}
-            className="min-h-[100px] text-sm"
+            className="min-h-[100px] text-sm font-mono"
           />
 
           <div className="flex gap-2">
@@ -259,7 +298,7 @@ export function EmailPreview({
               variant="outline"
               onClick={() => {
                 setEditing(false);
-                setDraftBody(emailBodyOverride ?? "");
+                setDraftBody(emailBodyOverride ?? emailTemplate.body_template);
               }}
             >
               Cancel
@@ -268,7 +307,7 @@ export function EmailPreview({
         </div>
       ) : (
         <div className="text-sm whitespace-pre-wrap">
-          <LinkifiedText text={displayBody} />
+          <LinkifiedText text={resolvedBody} />
         </div>
       )}
 
@@ -282,12 +321,43 @@ export function EmailPreview({
             size="sm"
             variant="outline"
             onClick={() => {
-              setDraftBody(displayBody);
+              setDraftBody(templateBody);
               setEditing(true);
             }}
           >
             Edit Message
           </Button>
+          {tokenGroups.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Braces className="mr-2 h-3.5 w-3.5" />
+                  Tokens
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0 max-h-72 overflow-auto" align="start">
+                {tokenGroups.map((group) => (
+                  <div key={group.label}>
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/50 border-b">
+                      {group.label}
+                    </div>
+                    {group.tokens.map((t) => (
+                      <button
+                        key={t.token}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent border-b last:border-b-0 font-mono"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(t.token);
+                          toast(`Copied ${t.token} to clipboard`);
+                        }}
+                      >
+                        {t.display}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
           <Button size="sm" variant="secondary" onClick={handleSend}>
             <Send className="mr-2 h-3.5 w-3.5" />
             Send Message

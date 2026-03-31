@@ -48,7 +48,7 @@ export function SortableItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} suppressHydrationWarning>
       {children({
         dragHandleProps: { ...attributes, ...listeners },
         isDragging,
@@ -67,6 +67,7 @@ export function DragHandle({
   return (
     <div
       {...dragHandleProps}
+      suppressHydrationWarning
       className={`cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none ${className}`}
     >
       <GripVertical className="h-4 w-4" />

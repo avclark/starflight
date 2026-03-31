@@ -50,9 +50,12 @@ export function TaskFormBlocks({
   tokenGroups?: TokenGroup[];
   onBlockReorder?: (oldIndex: number, newIndex: number) => void;
 }) {
-  const responseMap = new Map(
-    responses.map((r) => [r.task_template_block_id, r.value_json])
-  );
+  const responseMap = new Map<string, Json | null>();
+  for (const r of responses) {
+    if (r.task_template_block_id) responseMap.set(r.task_template_block_id, r.value_json);
+    const instId = (r as Record<string, unknown>).task_instance_block_id as string | null;
+    if (instId) responseMap.set(instId, r.value_json);
+  }
 
   const renderableBlocks = blocks.filter((b) => b.block_type !== "comments");
   if (renderableBlocks.length === 0) return null;
@@ -111,9 +114,12 @@ export function validateRequiredBlocks(
   draft: Record<string, Json | null>,
   responses: Response[]
 ): string[] {
-  const responseMap = new Map(
-    responses.map((r) => [r.task_template_block_id, r.value_json])
-  );
+  const responseMap = new Map<string, Json | null>();
+  for (const r of responses) {
+    if (r.task_template_block_id) responseMap.set(r.task_template_block_id, r.value_json);
+    const instId = (r as Record<string, unknown>).task_instance_block_id as string | null;
+    if (instId) responseMap.set(instId, r.value_json);
+  }
   const errors: string[] = [];
 
   for (const block of blocks) {

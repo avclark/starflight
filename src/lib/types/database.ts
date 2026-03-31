@@ -595,21 +595,24 @@ export interface Database {
         Row: {
           id: string;
           task_id: string;
-          task_template_block_id: string;
+          task_template_block_id: string | null;
+          task_instance_block_id: string | null;
           value_json: Json | null;
           updated_at: string;
         };
         Insert: {
           id?: string;
           task_id: string;
-          task_template_block_id: string;
+          task_template_block_id?: string | null;
+          task_instance_block_id?: string | null;
           value_json?: Json | null;
           updated_at?: string;
         };
         Update: {
           id?: string;
           task_id?: string;
-          task_template_block_id?: string;
+          task_template_block_id?: string | null;
+          task_instance_block_id?: string | null;
           value_json?: Json | null;
           updated_at?: string;
         };

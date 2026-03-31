@@ -252,11 +252,17 @@ function TaskRow({
     // If there are unsaved draft changes, save them first
     const hasDraftChanges = Object.keys(blockDraft).length > 0;
     if (hasDraftChanges) {
+      const instanceBlockIds = new Set(instanceBlocks.map((b) => b.id));
       const responsesToSave = Object.entries(blockDraft).map(
-        ([blockId, value]) => ({
-          task_template_block_id: blockId,
-          value_json: value,
-        })
+        ([blockId, value]) => {
+          const isInstance = instanceBlockIds.has(blockId);
+          return {
+            task_template_block_id: isInstance ? null : blockId,
+            task_instance_block_id: isInstance ? blockId : null,
+            value_json: value,
+            source: (isInstance ? "instance" : "template") as "template" | "instance",
+          };
+        }
       );
       await saveTaskBlockResponses(task.id, episodeId, workflowId, responsesToSave);
     }
@@ -293,11 +299,17 @@ function TaskRow({
     }
 
     // Save block responses
+    const instanceBlockIds = new Set(instanceBlocks.map((b) => b.id));
     const responsesToSave = Object.entries(blockDraft).map(
-      ([blockId, value]) => ({
-        task_template_block_id: blockId,
-        value_json: value,
-      })
+      ([blockId, value]) => {
+        const isInstance = instanceBlockIds.has(blockId);
+        return {
+          task_template_block_id: isInstance ? null : blockId,
+          task_instance_block_id: isInstance ? blockId : null,
+          value_json: value,
+          source: (isInstance ? "instance" : "template") as "template" | "instance",
+        };
+      }
     );
     if (responsesToSave.length > 0) {
       await saveTaskBlockResponses(task.id, episodeId, workflowId, responsesToSave);
@@ -525,6 +537,7 @@ function TaskRow({
                       episodeId={episodeId}
                       workflowId={workflowId}
                       emailBodyOverride={task.email_body_override}
+                      tokenGroups={tokenGroupsProp}
                     />
                   </>
                 )}
@@ -1153,22 +1166,41 @@ export function EpisodeDetail({
     id: `sd-${i}`,
     label,
   }));
+  // Build a combined map of IDs → titles for token lookup
+  // Template blocks use task_template_id, instance blocks use task_id
   const templateIdToTitle = new Map(
     tasks.map((t) => [t.task_template_id, t.title])
   );
-  const tokenTemplates = [...templateIdToTitle.entries()].map(([id, title]) => ({
+  const taskIdToTitle = new Map(
+    tasks.map((t) => [t.id, t.title])
+  );
+  // Merge both maps so buildTokenGroups can find titles for either key
+  const allIdToTitle = new Map([...templateIdToTitle, ...taskIdToTitle]);
+  const tokenTemplates = [...allIdToTitle.entries()].map(([id, title]) => ({
     id,
     title,
   }));
-  const tokenGroups = buildTokenGroups({
-    settingDefinitions: settingDefs,
-    templates: tokenTemplates,
-    blocks: templateBlocks.map((b) => ({
+
+  // Combine template blocks and instance blocks for token suggestions
+  const allTokenBlocks = [
+    ...templateBlocks.map((b) => ({
       task_template_id: b.task_template_id,
       label: b.label,
       block_type: b.block_type,
       token_name: b.token_name,
     })),
+    ...instanceBlocks.map((b) => ({
+      task_template_id: b.task_id, // Use task_id as the lookup key
+      label: b.label,
+      block_type: b.block_type,
+      token_name: null as string | null,
+    })),
+  ];
+
+  const tokenGroups = buildTokenGroups({
+    settingDefinitions: settingDefs,
+    templates: tokenTemplates,
+    blocks: allTokenBlocks,
   });
 
   const [localTaskOrder, setLocalTaskOrder] = useState<string[] | null>(null);

@@ -58,22 +58,95 @@ export async function saveTaskBlockResponses(
   episodeId: string,
   workflowId: string,
   responses: {
-    task_template_block_id: string;
+    task_template_block_id?: string | null;
+    task_instance_block_id?: string | null;
     value_json: Json | null;
+    source?: "template" | "instance";
   }[]
 ) {
   const supabase = await createClient();
 
   for (const r of responses) {
-    await supabase.from("task_block_responses").upsert(
-      {
-        task_id: taskId,
-        task_template_block_id: r.task_template_block_id,
-        value_json: r.value_json,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "task_id,task_template_block_id" }
-    );
+    if (r.source === "instance") {
+      // Instance block response
+      const blockId = r.task_instance_block_id!;
+
+      // Try to find existing response for this instance block
+      const { data: existing } = await supabase
+        .from("task_block_responses")
+        .select("id")
+        .eq("task_id", taskId)
+        .eq("task_instance_block_id", blockId)
+        .maybeSingle();
+
+      // Also check if it was saved in the template column (before migration fix)
+      const { data: existingLegacy } = !existing
+        ? await supabase
+            .from("task_block_responses")
+            .select("id")
+            .eq("task_id", taskId)
+            .eq("task_template_block_id", blockId)
+            .maybeSingle()
+        : { data: null };
+
+      if (existing) {
+        await supabase
+          .from("task_block_responses")
+          .update({ value_json: r.value_json, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else if (existingLegacy) {
+        // Migrate: update the legacy row to use the correct column
+        await supabase
+          .from("task_block_responses")
+          .update({
+            task_instance_block_id: blockId,
+            task_template_block_id: null,
+            value_json: r.value_json,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingLegacy.id);
+      } else {
+        const { error: insertError } = await supabase.from("task_block_responses").insert({
+          task_id: taskId,
+          task_instance_block_id: blockId,
+          task_template_block_id: null,
+          value_json: r.value_json,
+          updated_at: new Date().toISOString(),
+        });
+        if (insertError) {
+          console.error("[saveTaskBlockResponses] instance insert error:", insertError.message);
+          // Fallback: try saving with template column if instance column doesn't exist
+          await supabase.from("task_block_responses").insert({
+            task_id: taskId,
+            task_template_block_id: blockId,
+            value_json: r.value_json,
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+    } else {
+      // Template block response
+      const { data: existing } = await supabase
+        .from("task_block_responses")
+        .select("id")
+        .eq("task_id", taskId)
+        .eq("task_template_block_id", r.task_template_block_id!)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("task_block_responses")
+          .update({ value_json: r.value_json, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("task_block_responses").insert({
+          task_id: taskId,
+          task_template_block_id: r.task_template_block_id,
+          value_json: r.value_json,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
   }
 
   revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);

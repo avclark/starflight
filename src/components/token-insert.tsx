@@ -69,6 +69,10 @@ export function buildTokenGroups({
   templates?: { id: string; title: string }[];
   blocks?: { task_template_id: string; label: string; block_type: string; token_name?: string | null }[];
 }): TokenGroup[] {
+  function toTokenFormat(s: string): string {
+    return s.toLowerCase().replace(/\s+/g, "_");
+  }
+
   const groups: TokenGroup[] = [
     {
       label: "Episode",
@@ -79,30 +83,28 @@ export function buildTokenGroups({
       tokens: [
         { token: "{{show.name}}", display: "{{show.name}}" },
         ...settingDefinitions.map((sd) => ({
-          token: `{{show.setting.${sd.label}}}`,
-          display: `{{show.setting.${sd.label}}}`,
+          token: `{{show.setting.${toTokenFormat(sd.label)}}}`,
+          display: `{{show.setting.${toTokenFormat(sd.label)}}}`,
         })),
       ],
     },
   ];
 
   const taskTokens: { token: string; display: string }[] = [];
+  const seenTokens = new Set<string>();
   for (const block of blocks) {
     if (["heading", "description", "comments"].includes(block.block_type)) continue;
+    let token: string;
     if (block.token_name) {
-      taskTokens.push({
-        token: `{{${block.token_name}}}`,
-        display: `{{${block.token_name}}}`,
-      });
+      token = `{{${toTokenFormat(block.token_name)}}}`;
     } else {
       const tpl = templates.find((t) => t.id === block.task_template_id);
-      if (tpl && block.label) {
-        taskTokens.push({
-          token: `{{${tpl.title}.${block.label}}}`,
-          display: `{{${tpl.title}.${block.label}}}`,
-        });
-      }
+      if (!tpl || !block.label) continue;
+      token = `{{${toTokenFormat(tpl.title)}.${toTokenFormat(block.label)}}}`;
     }
+    if (seenTokens.has(token)) continue;
+    seenTokens.add(token);
+    taskTokens.push({ token, display: token });
   }
 
   if (taskTokens.length > 0) {
