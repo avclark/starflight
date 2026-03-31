@@ -50,6 +50,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { InlineEdit } from "@/components/inline-edit";
+import { UserAvatar } from "@/components/user-avatar";
 import { SortableList, SortableItem, DragHandle, arrayMove } from "@/components/sortable-list";
 import { InsertTaskButton } from "@/components/insert-task-button";
 import { TaskPicker } from "@/components/task-picker";
@@ -388,7 +389,8 @@ function TaskRow({
           </div>
 
           {assignedName && (
-            <Badge variant="outline" className="text-xs font-normal">
+            <Badge variant="outline" className="text-xs font-normal gap-1">
+              <UserAvatar name={assignedName} size="xs" />
               {assignedName}
             </Badge>
           )}

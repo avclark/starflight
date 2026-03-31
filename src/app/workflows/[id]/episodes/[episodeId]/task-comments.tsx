@@ -4,6 +4,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { MentionTextarea } from "@/components/mention-textarea";
+import { UserAvatar } from "@/components/user-avatar";
 import { postComment } from "@/lib/actions/blocks";
 import type { Tables } from "@/lib/types/database";
 
@@ -47,6 +48,7 @@ export function TaskComments({
           {comments.map((c) => (
             <div key={c.id} className="space-y-1">
               <div className="flex items-center gap-2">
+                <UserAvatar name={userMap[c.user_id] ?? "?"} size="xs" />
                 <span className="text-xs font-medium">
                   {userMap[c.user_id] ?? "Unknown"}
                 </span>

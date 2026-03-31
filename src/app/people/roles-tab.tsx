@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -158,6 +159,7 @@ export function RolesTab({
                         variant="secondary"
                         className="gap-1 pr-1"
                       >
+                        <UserAvatar name={person.full_name} avatarUrl={person.avatar_url} size="xs" />
                         {person.full_name}
                         <button
                           onClick={() =>

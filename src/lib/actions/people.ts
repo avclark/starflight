@@ -8,12 +8,51 @@ export async function createPerson(formData: FormData) {
   const email = formData.get("email") as string;
   if (!full_name || !email) return { error: "Name and email are required" };
 
+  const parts = full_name.trim().split(/\s+/);
+  const first_name = parts[0] ?? "";
+  const last_name = parts.slice(1).join(" ") ?? "";
+
   const supabase = await createClient();
-  const { error } = await supabase.from("users").insert({ full_name, email });
+  const { error } = await supabase.from("users").insert({
+    full_name,
+    first_name,
+    last_name,
+    email,
+  });
 
   if (error) return { error: error.message };
 
   revalidatePath("/people");
+  return { success: true };
+}
+
+export async function updatePerson(
+  userId: string,
+  data: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    timezone: string | null;
+  }
+) {
+  const supabase = await createClient();
+  const full_name = `${data.first_name} ${data.last_name}`.trim();
+
+  const { error } = await supabase
+    .from("users")
+    .update({
+      first_name: data.first_name,
+      last_name: data.last_name,
+      full_name,
+      email: data.email,
+      timezone: data.timezone,
+    })
+    .eq("id", userId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/people");
+  revalidatePath(`/people/${userId}`);
   return { success: true };
 }
 

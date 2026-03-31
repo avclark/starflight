@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,10 +30,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { createPerson, deletePerson } from "@/lib/actions/people";
 import type { Tables } from "@/lib/types/database";
 
-export function PeopleTable({ people }: { people: Tables<"users">[] }) {
+type Role = Tables<"roles">;
+type RoleMember = Tables<"role_members">;
+
+export function PeopleTable({
+  people,
+  roles = [],
+  roleMembers = [],
+}: {
+  people: Tables<"users">[];
+  roles?: Role[];
+  roleMembers?: RoleMember[];
+}) {
+  const roleMap = new Map(roles.map((r) => [r.id, r.name]));
+
+  function getRolesForPerson(userId: string): string[] {
+    return roleMembers
+      .filter((rm) => rm.user_id === userId)
+      .map((rm) => roleMap.get(rm.role_id))
+      .filter(Boolean) as string[];
+  }
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<"users"> | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -116,10 +138,35 @@ export function PeopleTable({ people }: { people: Tables<"users">[] }) {
             ) : (
               people.map((person) => (
                 <TableRow key={person.id}>
-                  <TableCell className="font-medium">
-                    {person.full_name}
+                  <TableCell>
+                    <Link
+                      href={`/people/${person.id}`}
+                      className="flex items-center gap-2 hover:underline"
+                    >
+                      <UserAvatar
+                        name={person.full_name}
+                        avatarUrl={person.avatar_url}
+                        size="md"
+                      />
+                      <div>
+                        <span className="font-medium block">{person.full_name}</span>
+                        <span className="text-xs text-muted-foreground">{person.email}</span>
+                        {(() => {
+                          const personRoles = getRolesForPerson(person.id);
+                          return personRoles.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {personRoles.map((roleName) => (
+                                <Badge key={roleName} variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {roleName}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    </Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">
                     {person.email}
                   </TableCell>
                   <TableCell>

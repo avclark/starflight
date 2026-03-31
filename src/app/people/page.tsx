@@ -29,7 +29,11 @@ export default async function PeoplePage() {
           <TabsTrigger value="roles">Roles</TabsTrigger>
         </TabsList>
         <TabsContent value="people">
-          <PeopleTable people={people ?? []} />
+          <PeopleTable
+            people={people ?? []}
+            roles={roles ?? []}
+            roleMembers={roleMembers ?? []}
+          />
         </TabsContent>
         <TabsContent value="roles">
           <RolesTab
