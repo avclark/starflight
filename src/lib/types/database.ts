@@ -76,22 +76,25 @@ export interface Database {
         Row: {
           id: string;
           label: string;
-          field_type: "yes_no" | "text" | "textarea" | "checklist";
+          field_type: "yes_no" | "text" | "textarea" | "checklist" | "rich_text" | "select_dropdown" | "radio_options" | "website_url" | "email_address" | "file_upload";
           display_order: number;
+          options_json: Json | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           label: string;
-          field_type: "yes_no" | "text" | "textarea" | "checklist";
+          field_type: "yes_no" | "text" | "textarea" | "checklist" | "rich_text" | "select_dropdown" | "radio_options" | "website_url" | "email_address" | "file_upload";
           display_order?: number;
+          options_json?: Json | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           label?: string;
-          field_type?: "yes_no" | "text" | "textarea" | "checklist";
+          field_type?: "yes_no" | "text" | "textarea" | "checklist" | "rich_text" | "select_dropdown" | "radio_options" | "website_url" | "email_address" | "file_upload";
           display_order?: number;
+          options_json?: Json | null;
           created_at?: string;
         };
         Relationships: [];

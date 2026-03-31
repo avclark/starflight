@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { saveShowSettings } from "@/lib/actions/show-settings";
 import type { Tables, Json } from "@/lib/types/database";
@@ -36,12 +43,48 @@ export function ShowSettingsTab({
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   function updateValue(defId: string, val: Json | null) {
     setDraft((prev) => ({ ...prev, [defId]: val }));
+    // Clear error on edit
+    if (errors[defId]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[defId];
+        return next;
+      });
+    }
   }
 
   async function handleSave() {
+    // Validate
+    const newErrors: Record<string, string> = {};
+    for (const def of definitions) {
+      const val = draft[def.id];
+      if (val === null || val === undefined || val === "") continue;
+
+      if (def.field_type === "website_url") {
+        const str = String(val);
+        if (!/^https?:\/\/.+\..+/.test(str)) {
+          newErrors[def.id] = "Please enter a valid URL (e.g., https://example.com)";
+        }
+      }
+
+      if (def.field_type === "email_address") {
+        const str = String(val);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str)) {
+          newErrors[def.id] = "Please enter a valid email address";
+        }
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
     setSaving(true);
     const payload = definitions.map((d) => ({
       setting_definition_id: d.id,
@@ -70,7 +113,11 @@ export function ShowSettingsTab({
             fieldType={def.field_type}
             value={draft[def.id]}
             onChange={(val) => updateValue(def.id, val)}
+            options={def.options_json}
           />
+          {errors[def.id] && (
+            <p className="text-sm text-destructive">{errors[def.id]}</p>
+          )}
         </div>
       ))}
 
@@ -90,11 +137,15 @@ function SettingInput({
   fieldType,
   value,
   onChange,
+  options,
 }: {
   fieldType: string;
   value: Json | null;
   onChange: (val: Json | null) => void;
+  options?: Json | null;
 }) {
+  const optionsList = Array.isArray(options) ? (options as string[]) : [];
+
   switch (fieldType) {
     case "yes_no": {
       const current = value === true ? "yes" : value === false ? "no" : null;
@@ -147,6 +198,83 @@ function SettingInput({
           value={value as string[] | null}
           onChange={onChange}
         />
+      );
+    case "rich_text":
+      return (
+        <Textarea
+          value={(value as string) ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          placeholder="Enter rich text"
+          className="max-w-md min-h-[100px]"
+        />
+      );
+    case "select_dropdown": {
+      const NONE = "__none__";
+      return (
+        <Select
+          value={(value as string) ?? NONE}
+          onValueChange={(v) => onChange(v === NONE ? null : v)}
+        >
+          <SelectTrigger className="max-w-md">
+            <SelectValue placeholder="Select..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>— None —</SelectItem>
+            {optionsList.map((opt) => (
+              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    case "radio_options":
+      return (
+        <div className="space-y-1">
+          {optionsList.map((opt) => (
+            <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                checked={value === opt}
+                onChange={() => onChange(opt)}
+                className="accent-primary"
+              />
+              {opt}
+            </label>
+          ))}
+        </div>
+      );
+    case "website_url":
+      return (
+        <Input
+          type="url"
+          value={(value as string) ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          placeholder="https://example.com"
+          className="max-w-md"
+        />
+      );
+    case "email_address":
+      return (
+        <Input
+          type="email"
+          value={(value as string) ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          placeholder="name@example.com"
+          className="max-w-md"
+        />
+      );
+    case "file_upload":
+      return (
+        <div className="space-y-2 max-w-md">
+          <Input
+            value={(value as string) ?? ""}
+            onChange={(e) => onChange(e.target.value || null)}
+            placeholder="File URL (upload coming soon)"
+          />
+          <p className="text-xs text-muted-foreground">
+            File upload functionality coming in a future update.
+          </p>
+        </div>
       );
     default:
       return null;

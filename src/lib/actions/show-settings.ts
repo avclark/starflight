@@ -32,7 +32,8 @@ export async function saveShowSettings(
 // Show Setting Definitions management
 export async function createSettingDefinition(
   label: string,
-  fieldType: "yes_no" | "text" | "textarea" | "checklist"
+  fieldType: "yes_no" | "text" | "textarea" | "checklist" | "rich_text" | "select_dropdown" | "radio_options" | "website_url" | "email_address" | "file_upload",
+  options?: string[]
 ) {
   if (!label) return { error: "Label is required" };
 
@@ -50,12 +51,13 @@ export async function createSettingDefinition(
   const { error } = await supabase.from("show_setting_definitions").insert({
     label,
     field_type: fieldType,
+    options_json: options && options.length > 0 ? options : null,
     display_order: nextOrder,
   });
 
   if (error) return { error: error.message };
 
-  revalidatePath("/settings/show-settings");
+  revalidatePath("/shows");
   return { success: true };
 }
 
@@ -73,7 +75,7 @@ export async function updateSettingDefinition(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/settings/show-settings");
+  revalidatePath("/shows");
   return { success: true };
 }
 
@@ -113,7 +115,7 @@ export async function deleteSettingDefinition(id: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/settings/show-settings");
+  revalidatePath("/shows");
   return { success: true, warnings };
 }
 
@@ -129,6 +131,6 @@ export async function reorderSettingDefinitions(
       .eq("id", orderedIds[i]);
   }
 
-  revalidatePath("/settings/show-settings");
+  revalidatePath("/shows");
   return { success: true };
 }
