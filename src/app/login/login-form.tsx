@@ -15,6 +15,8 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   // Handle hash token from invite/magic link landing on login page
   useEffect(() => {
@@ -86,6 +88,49 @@ export function LoginForm() {
     setMagicLinkSent(true);
   }
 
+  async function handleForgotPassword() {
+    if (!email) {
+      setError("Please enter your email address first");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setResetSent(true);
+  }
+
+  if (resetSent) {
+    return (
+      <div className="rounded-lg border p-6 text-center space-y-2">
+        <p className="text-sm font-medium">Check your email</p>
+        <p className="text-sm text-muted-foreground">
+          We sent a password reset link to <strong>{email}</strong>.
+          Click the link in the email to set a new password.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => { setResetSent(false); setShowForgot(false); }}
+        >
+          Back to login
+        </Button>
+      </div>
+    );
+  }
+
   if (magicLinkSent) {
     return (
       <div className="rounded-lg border p-6 text-center space-y-2">
@@ -141,16 +186,49 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <Separator />
+      {showForgot ? (
+        <div className="space-y-3 pt-1">
+          <p className="text-sm text-muted-foreground">
+            Enter your email and we&apos;ll send a link to reset your password.
+          </p>
+          <Button
+            className="w-full"
+            onClick={handleForgotPassword}
+            disabled={loading || !email}
+          >
+            {loading ? "Sending..." : "Send Reset Link"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            onClick={() => setShowForgot(false)}
+          >
+            Back to login
+          </Button>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:underline w-full text-center"
+            onClick={() => setShowForgot(true)}
+          >
+            Forgot password?
+          </button>
 
-      <Button
-        variant="outline"
-        className="w-full"
-        onClick={handleMagicLink}
-        disabled={loading}
-      >
-        Sign in with magic link
-      </Button>
+          <Separator />
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleMagicLink}
+            disabled={loading}
+          >
+            Sign in with magic link
+          </Button>
+        </>
+      )}
     </div>
   );
 }
