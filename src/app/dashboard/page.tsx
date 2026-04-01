@@ -1,31 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardTasks } from "./dashboard-tasks";
-import { UserSwitcher } from "./user-switcher";
 import Link from "next/link";
 import { ClientDate } from "@/components/client-date";
 import { ShowAvatar } from "@/components/show-avatar";
 import type { Tables } from "@/lib/types/database";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ userId?: string }>;
-}) {
-  const { userId } = await searchParams;
+export default async function DashboardPage() {
   const supabase = await createClient();
+  const currentUser = await getCurrentUser();
+  const userId = currentUser?.id;
 
-  // Fetch all people for the switcher
-  const { data: people } = await supabase
-    .from("users")
-    .select("id, full_name")
-    .order("full_name");
-
-  // TODO: Replace userId from searchParams with actual authenticated user when auth is added
   let episodes: Tables<"episodes">[] = [];
 
   if (userId) {
-    // Find episodes where this user has at least one task assigned
+    // Find episodes where the current user has at least one task assigned
     const { data: userTasks } = await supabase
       .from("tasks")
       .select("episode_id")
@@ -55,8 +45,8 @@ export default async function DashboardPage({
   }
 
   // Fetch related shows and workflows for display
-  const showIds = [...new Set((episodes ?? []).map((e) => e.show_id))];
-  const workflowIds = [...new Set((episodes ?? []).map((e) => e.workflow_id))];
+  const showIds = [...new Set(episodes.map((e) => e.show_id))];
+  const workflowIds = [...new Set(episodes.map((e) => e.workflow_id))];
 
   const { data: shows } = showIds.length
     ? await supabase.from("shows").select("id, name, avatar_url").in("id", showIds)
@@ -69,7 +59,7 @@ export default async function DashboardPage({
   const showAvatarMap = new Map((shows ?? []).map((s) => [s.id, s.avatar_url]));
   const workflowMap = new Map((workflows ?? []).map((w) => [w.id, w.name]));
 
-  // Fetch tasks — filtered by user if set
+  // Fetch tasks — filtered by current user
   let tasksQuery = supabase
     .from("tasks")
     .select("*")
@@ -98,19 +88,16 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <UserSwitcher people={people ?? []} />
-      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>My Episodes</CardTitle>
           </CardHeader>
           <CardContent>
-            {!episodes || episodes.length === 0 ? (
+            {episodes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {userId ? "No active episodes for this user." : "No active episodes."}
+                No active episodes.
               </p>
             ) : (
               <div className="space-y-3">
@@ -124,13 +111,13 @@ export default async function DashboardPage({
                       <p className="text-sm font-medium truncate">
                         {ep.title}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
                         <ShowAvatar name={showMap.get(ep.show_id) ?? ""} avatarUrl={showAvatarMap.get(ep.show_id)} size="xs" />
                         {showMap.get(ep.show_id) ?? "Unknown show"}
                         {workflowMap.has(ep.workflow_id)
                           ? ` · ${workflowMap.get(ep.workflow_id)}`
                           : ""}
-                      </p>
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="h-2 w-16 rounded-full bg-muted overflow-hidden">

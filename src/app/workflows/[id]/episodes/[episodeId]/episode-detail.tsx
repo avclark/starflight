@@ -98,10 +98,12 @@ function TaskRow({
   workflowId,
   episodeId,
   assignedName,
+  assignedAvatarUrl,
   blocks,
   responses,
   comments,
   userMap,
+  userAvatarMap: userAvatarMapProp,
   people,
   emailTemplate,
   episodeTitle,
@@ -127,10 +129,12 @@ function TaskRow({
   workflowId: string;
   episodeId: string;
   assignedName?: string;
+  assignedAvatarUrl?: string | null;
   blocks: Block[];
   responses: BlockResponse[];
   comments: Comment[];
   userMap: Record<string, string>;
+  userAvatarMap?: Record<string, string | null>;
   people: Person[];
   emailTemplate?: EmailTpl | null;
   episodeTitle: string;
@@ -391,7 +395,7 @@ function TaskRow({
 
           {assignedName && (
             <Badge variant="outline" className="text-xs font-normal gap-1">
-              <UserAvatar name={assignedName} size="xs" />
+              <UserAvatar name={assignedName} avatarUrl={assignedAvatarUrl} size="xs" />
               {assignedName}
             </Badge>
           )}
@@ -554,6 +558,7 @@ function TaskRow({
                       workflowId={workflowId}
                       comments={comments}
                       userMap={userMap}
+                      userAvatarMap={userAvatarMapProp ?? {}}
                       people={people}
                     />
                   </>
@@ -1129,6 +1134,7 @@ export function EpisodeDetail({
   episode,
   tasks,
   userMap = {},
+  userAvatarMap = {},
   templateBlocks = [],
   blockResponses = [],
   comments = [],
@@ -1153,6 +1159,7 @@ export function EpisodeDetail({
   };
   tasks: Task[];
   userMap?: Record<string, string>;
+  userAvatarMap?: Record<string, string | null>;
   templateBlocks?: Block[];
   blockResponses?: BlockResponse[];
   comments?: Comment[];
@@ -1329,6 +1336,11 @@ export function EpisodeDetail({
                   ? userMap[task.assigned_user_id]
                   : undefined
               }
+              assignedAvatarUrl={
+                task.assigned_user_id
+                  ? userAvatarMap[task.assigned_user_id] ?? null
+                  : null
+              }
               blocks={templateBlocks.filter(
                 (b) => b.task_template_id === task.task_template_id
               )}
@@ -1337,6 +1349,7 @@ export function EpisodeDetail({
               )}
               comments={comments.filter((c) => c.task_id === task.id)}
               userMap={userMap}
+              userAvatarMap={userAvatarMap}
               people={people}
               emailTemplate={
                 emailTemplates.find(

@@ -17,6 +17,7 @@ export function TaskComments({
   workflowId,
   comments,
   userMap,
+  userAvatarMap = {},
   people,
 }: {
   taskId: string;
@@ -24,6 +25,7 @@ export function TaskComments({
   workflowId: string;
   comments: Comment[];
   userMap: Record<string, string>;
+  userAvatarMap?: Record<string, string | null>;
   people: Person[];
 }) {
   const [body, setBody] = useState("");
@@ -32,9 +34,14 @@ export function TaskComments({
   async function handlePost() {
     if (!body.trim()) return;
     setPosting(true);
-    await postComment(taskId, episodeId, workflowId, body);
-    setBody("");
+    const result = await postComment(taskId, episodeId, workflowId, body);
     setPosting(false);
+    if (result.error) {
+      const { toast } = await import("sonner");
+      toast(result.error);
+      return;
+    }
+    setBody("");
   }
 
   return (
@@ -48,7 +55,7 @@ export function TaskComments({
           {comments.map((c) => (
             <div key={c.id} className="space-y-1">
               <div className="flex items-center gap-2">
-                <UserAvatar name={userMap[c.user_id] ?? "?"} size="xs" />
+                <UserAvatar name={userMap[c.user_id] ?? "?"} avatarUrl={userAvatarMap[c.user_id]} size="xs" />
                 <span className="text-xs font-medium">
                   {userMap[c.user_id] ?? "Unknown"}
                 </span>

@@ -180,15 +180,12 @@ export async function postComment(
 
   const supabase = await createClient();
 
-  // TODO: Use actual authenticated user ID when auth is added
-  // For now, get the first user as a placeholder
-  const { data: users } = await supabase
-    .from("users")
-    .select("id")
-    .limit(1);
+  // Get authenticated user via the shared helper
+  const { getCurrentUser } = await import("@/lib/auth");
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return { error: "Not authenticated" };
 
-  const userId = users?.[0]?.id;
-  if (!userId) return { error: "No users found" };
+  const userId = currentUser.id;
 
   const { error } = await supabase.from("task_comments").insert({
     task_id: taskId,

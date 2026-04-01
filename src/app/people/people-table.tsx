@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { createPerson, deletePerson } from "@/lib/actions/people";
+import { invitePerson, deletePerson } from "@/lib/actions/people";
 import type { Tables } from "@/lib/types/database";
 
 type Role = Tables<"roles">;
@@ -58,9 +58,21 @@ export function PeopleTable({
   const [deleteTarget, setDeleteTarget] = useState<Tables<"users"> | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteWarning, setInviteWarning] = useState<string | null>(null);
+
   async function handleSubmit(formData: FormData) {
-    const result = await createPerson(formData);
-    if (result.success) setOpen(false);
+    setInviteError(null);
+    setInviteWarning(null);
+    const result = await invitePerson(formData);
+    if (result.error) {
+      setInviteError(result.error);
+      return;
+    }
+    if (result.warning) {
+      setInviteWarning(result.warning);
+    }
+    setOpen(false);
   }
 
   async function handleDelete() {
@@ -81,35 +93,51 @@ export function PeopleTable({
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add Person
+              Invite Person
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Person</DialogTitle>
+              <DialogTitle>Invite Person</DialogTitle>
             </DialogHeader>
             <form action={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="full_name">Name</Label>
-                <Input
-                  id="full_name"
-                  name="full_name"
-                  placeholder="Full name"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email address</Label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   placeholder="email@example.com"
                   required
+                  autoFocus
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">First name <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Input
+                    id="first_name"
+                    name="first_name"
+                    placeholder="First name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">Last name <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Input
+                    id="last_name"
+                    name="last_name"
+                    placeholder="Last name"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                An invite email will be sent with a link to set their password.
+              </p>
+              {inviteError && (
+                <p className="text-sm text-destructive">{inviteError}</p>
+              )}
               <div className="flex justify-end">
-                <Button type="submit">Add</Button>
+                <Button type="submit">Send Invite</Button>
               </div>
             </form>
           </DialogContent>

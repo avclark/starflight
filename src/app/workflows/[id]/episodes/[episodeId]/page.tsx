@@ -42,11 +42,14 @@ export default async function EpisodeDetailPage({
   const { data: assignedUsers } = assignedUserIds.length
     ? await supabase
         .from("users")
-        .select("id, full_name")
+        .select("id, full_name, avatar_url")
         .in("id", assignedUserIds)
     : { data: [] };
   const userMap = Object.fromEntries(
     (assignedUsers ?? []).map((u) => [u.id, u.full_name])
+  );
+  const userAvatarMap = Object.fromEntries(
+    (assignedUsers ?? []).map((u) => [u.id, u.avatar_url])
   );
 
   // Fetch template blocks for all task templates referenced by these tasks
@@ -114,11 +117,14 @@ export default async function EpisodeDetailPage({
   const { data: allUsers } = allUserIds.length
     ? await supabase
         .from("users")
-        .select("id, full_name")
+        .select("id, full_name, avatar_url")
         .in("id", allUserIds)
     : { data: [] };
   const fullUserMap = Object.fromEntries(
     (allUsers ?? []).map((u) => [u.id, u.full_name])
+  );
+  const fullUserAvatarMap = Object.fromEntries(
+    (allUsers ?? []).map((u) => [u.id, u.avatar_url ?? null])
   );
 
   // People for @mention dropdown
@@ -188,6 +194,7 @@ export default async function EpisodeDetailPage({
       }}
       tasks={tasks ?? []}
       userMap={fullUserMap}
+      userAvatarMap={fullUserAvatarMap}
       templateBlocks={templateBlocks ?? []}
       blockResponses={blockResponses ?? []}
       comments={comments ?? []}

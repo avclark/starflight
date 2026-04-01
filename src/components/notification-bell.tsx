@@ -12,7 +12,6 @@ import {
 import { ClientDate } from "@/components/client-date";
 import { createClient } from "@/lib/supabase/client";
 import { markNotificationsRead } from "@/lib/actions/actions";
-import { CURRENT_USER_COOKIE } from "@/lib/current-user";
 
 type Notification = {
   id: string;
@@ -24,60 +23,60 @@ type Notification = {
   created_at: string;
 };
 
-function getCurrentUserId(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(
-    new RegExp(`(?:^|; )${CURRENT_USER_COOKIE}=([^;]*)`)
-  );
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-export function NotificationBell() {
+export function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
 
-  const loadUnread = useCallback(async () => {
-    const userId = getCurrentUserId();
-    if (!userId) {
-      setNotifications([]);
-      return;
-    }
+  const loadData = useCallback(async () => {
     const supabase = createClient();
+
+    // Get total unread count
+    const { count } = await supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("read", false);
+
+    setUnreadCount(count ?? 0);
+
+    // Get recent unread for the popup (only 10)
     const { data } = await supabase
       .from("notifications")
       .select("*")
       .eq("user_id", userId)
       .eq("read", false)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(10);
+
     setNotifications((data as Notification[]) ?? []);
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    loadUnread();
-    const interval = setInterval(loadUnread, 10000);
+    loadData();
+    const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
-  }, [loadUnread]);
-
-  // Also reload when cookie changes (user switcher)
-  useEffect(() => {
-    function handleCookieChange() {
-      loadUnread();
-    }
-    window.addEventListener("focus", handleCookieChange);
-    return () => window.removeEventListener("focus", handleCookieChange);
-  }, [loadUnread]);
+  }, [loadData]);
 
   async function handleOpen(isOpen: boolean) {
     setOpen(isOpen);
-    if (isOpen) await loadUnread();
+    if (isOpen) await loadData();
   }
 
   async function handleMarkAllRead() {
-    const ids = notifications.map((n) => n.id);
+    // Mark ALL unread, not just the visible ones
+    const supabase = createClient();
+    const { data: allUnread } = await supabase
+      .from("notifications")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("read", false);
+
+    const ids = (allUnread ?? []).map((n) => n.id);
     if (ids.length === 0) return;
     await markNotificationsRead(ids);
     setNotifications([]);
+    setUnreadCount(0);
   }
 
   return (
@@ -85,9 +84,9 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon-sm" className="relative">
           <Bell className="h-4 w-4" />
-          {notifications.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-              {notifications.length > 9 ? "9+" : notifications.length}
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+              {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </Button>
@@ -95,14 +94,14 @@ export function NotificationBell() {
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-medium">Notifications</span>
-          {notifications.length > 0 && (
+          {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
               className="h-auto py-0.5 text-xs"
               onClick={handleMarkAllRead}
             >
-              Mark all read
+              Mark all read ({unreadCount})
             </Button>
           )}
         </div>
