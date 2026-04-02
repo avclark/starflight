@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/require-admin";
 import { WorkflowsGrid } from "./workflows-grid";
 
 export default async function WorkflowsPage() {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: workflows } = await supabase
     .from("workflows")

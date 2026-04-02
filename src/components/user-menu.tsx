@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,8 +24,17 @@ export function UserMenu({
     avatar_url: string | null;
   };
 }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  function navigateTo(path: string) {
+    setOpen(false);
+    router.push(path);
+    router.refresh();
+  }
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-auto p-1.5 gap-2">
           <UserAvatar
@@ -38,21 +48,25 @@ export function UserMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <div className="px-2 py-1.5">
+        <DropdownMenuItem
+          className="flex-col items-start cursor-pointer"
+          onClick={() => navigateTo(`/people/${user.id}`)}
+        >
           <p className="text-sm font-medium">{user.full_name}</p>
           <p className="text-xs text-muted-foreground">{user.email}</p>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href={`/people/${user.id}`}>
-            <User className="mr-2 h-4 w-4" />
-            Profile
-          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={() => logout()}
-          className="text-destructive"
+          className="cursor-pointer"
+          onClick={() => navigateTo(`/people/${user.id}?tab=profile`)}
+        >
+          <User className="mr-2 h-4 w-4" />
+          My Profile
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => { setOpen(false); logout(); }}
+          className="text-destructive cursor-pointer"
         >
           <LogOut className="mr-2 h-4 w-4" />
           Logout

@@ -8,6 +8,7 @@ export async function invitePerson(formData: FormData) {
   const email = formData.get("email") as string;
   const firstName = (formData.get("first_name") as string) ?? "";
   const lastName = (formData.get("last_name") as string) ?? "";
+  const role = (formData.get("role") as "admin" | "user") ?? "user";
 
   if (!email) return { error: "Email is required" };
 
@@ -29,6 +30,7 @@ export async function invitePerson(formData: FormData) {
     first_name: firstName || fullName.split(" ")[0],
     last_name: lastName || fullName.split(" ").slice(1).join(" ") || null,
     email,
+    role,
   });
 
   if (insertError) return { error: insertError.message };
@@ -71,20 +73,24 @@ export async function updatePerson(
     last_name: string;
     email: string;
     timezone: string | null;
+    role?: "admin" | "user";
   }
 ) {
   const supabase = await createServerClient();
   const full_name = `${data.first_name} ${data.last_name}`.trim();
 
+  const updates: Record<string, unknown> = {
+    first_name: data.first_name,
+    last_name: data.last_name,
+    full_name,
+    email: data.email,
+    timezone: data.timezone,
+  };
+  if (data.role) updates.role = data.role;
+
   const { error } = await supabase
     .from("users")
-    .update({
-      first_name: data.first_name,
-      last_name: data.last_name,
-      full_name,
-      email: data.email,
-      timezone: data.timezone,
-    })
+    .update(updates)
     .eq("id", userId);
 
   if (error) return { error: error.message };

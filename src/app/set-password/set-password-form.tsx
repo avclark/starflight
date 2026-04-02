@@ -38,6 +38,22 @@ export function SetPasswordForm() {
       return;
     }
 
+    // Find the user's app profile ID to redirect to their profile
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser?.email) {
+      const { data: appUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", authUser.email)
+        .maybeSingle();
+
+      if (appUser) {
+        router.push(`/people/${appUser.id}?tab=profile`);
+        router.refresh();
+        return;
+      }
+    }
+
     router.push("/dashboard");
     router.refresh();
   }

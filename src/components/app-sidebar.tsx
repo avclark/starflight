@@ -21,16 +21,19 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Workflows", href: "/workflows", icon: GitBranch },
-  { title: "Processes", href: "/processes", icon: Blocks },
-  { title: "Shows", href: "/shows", icon: Radio },
-  { title: "People", href: "/people", icon: Users },
+const allNavItems = [
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, adminOnly: false },
+  { title: "Workflows", href: "/workflows", icon: GitBranch, adminOnly: true },
+  { title: "Processes", href: "/processes", icon: Blocks, adminOnly: true },
+  { title: "Shows", href: "/shows", icon: Radio, adminOnly: true },
+  { title: "People", href: "/people", icon: Users, adminOnly: true },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ userRole = "user" }: { userRole?: "admin" | "user" }) {
   const pathname = usePathname();
+  const navItems = allNavItems.filter(
+    (item) => !item.adminOnly || userRole === "admin"
+  );
 
   return (
     <Sidebar collapsible="none">

@@ -19,6 +19,7 @@ export interface Database {
           avatar_url: string | null;
           timezone: string | null;
           auth_id: string | null;
+          role: "admin" | "user";
           created_at: string;
         };
         Insert: {
@@ -30,6 +31,7 @@ export interface Database {
           avatar_url?: string | null;
           timezone?: string | null;
           auth_id?: string | null;
+          role?: "admin" | "user";
           created_at?: string;
         };
         Update: {
@@ -41,6 +43,7 @@ export interface Database {
           avatar_url?: string | null;
           timezone?: string | null;
           auth_id?: string | null;
+          role?: "admin" | "user";
           created_at?: string;
         };
         Relationships: [];

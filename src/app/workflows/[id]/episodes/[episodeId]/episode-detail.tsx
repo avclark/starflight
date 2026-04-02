@@ -123,6 +123,7 @@ function TaskRow({
   dateRules: dateRulesProp,
   taskTemplatesForRules,
   dragHandleProps: taskDragHandleProps,
+  isAdminUser = false,
   isTaskDragging,
 }: {
   task: Task;
@@ -155,6 +156,7 @@ function TaskRow({
   taskTemplatesForRules: { id: string; title: string }[];
   dragHandleProps?: Record<string, unknown>;
   isTaskDragging?: boolean;
+  isAdminUser?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -422,6 +424,7 @@ function TaskRow({
             {task.status}
           </Badge>
 
+          {isAdminUser && (
           <div onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -475,6 +478,7 @@ function TaskRow({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          )}
         </div>
 
         {expanded && (
@@ -482,9 +486,9 @@ function TaskRow({
             <Tabs defaultValue="content">
               <TabsList className="h-8">
                 <TabsTrigger value="content" className="text-xs">Content</TabsTrigger>
-                <TabsTrigger value="assignment" className="text-xs">Assignment</TabsTrigger>
-                <TabsTrigger value="visibility" className="text-xs">Visibility</TabsTrigger>
-                <TabsTrigger value="dependencies" className="text-xs">Dependencies</TabsTrigger>
+                {isAdminUser && <TabsTrigger value="assignment" className="text-xs">Assignment</TabsTrigger>}
+                {isAdminUser && <TabsTrigger value="visibility" className="text-xs">Visibility</TabsTrigger>}
+                {isAdminUser && <TabsTrigger value="dependencies" className="text-xs">Dependencies</TabsTrigger>}
                 <TabsTrigger value="dates" className="text-xs">Dates</TabsTrigger>
                 <TabsTrigger value="actions" className="text-xs">Actions</TabsTrigger>
               </TabsList>
@@ -510,7 +514,7 @@ function TaskRow({
                       setLocalBlockOrder(newOrder);
                       reorderMergedBlocks(task.id, episodeId, workflowId, newOrder);
                     }}
-                    blockActions={(block, index) => (
+                    blockActions={isAdminUser ? (block, index) => (
                       <BlockActions
                         block={block as MergedBlock}
                         index={index}
@@ -521,14 +525,14 @@ function TaskRow({
                         allBlocks={mergedBlocks}
                         onReorder={(newOrder) => setLocalBlockOrder(newOrder)}
                       />
-                    )}
+                    ) : undefined}
                   />
                 )}
-                <AddBlockButton
+                {isAdminUser && <AddBlockButton
                   taskId={task.id}
                   episodeId={episodeId}
                   workflowId={workflowId}
-                />
+                />}
                 {emailTemplate && (
                   <>
                     <Separator />
@@ -1147,6 +1151,7 @@ export function EpisodeDetail({
   showRoleAssignments = [],
   dateRules = [],
   taskTemplatesForRules = [],
+  isAdminUser = false,
 }: {
   workflowId: string;
   episode: {
@@ -1172,6 +1177,7 @@ export function EpisodeDetail({
   showRoleAssignments?: { role_id: string; user_id: string }[];
   dateRules?: Tables<"task_template_date_rules">[];
   taskTemplatesForRules?: { id: string; title: string }[];
+  isAdminUser?: boolean;
 }) {
   // Build token groups for the token insert feature
   const settingDefs = Object.keys(showSettingsMap).map((label, i) => ({
@@ -1268,7 +1274,7 @@ export function EpisodeDetail({
             <p className="text-sm text-muted-foreground">
               No tasks in this episode.
             </p>
-            <EpisodeEmptyTaskState
+            {isAdminUser && <EpisodeEmptyTaskState
               onBlankTask={() => {
                 const templateId = tasks[0]?.task_template_id ?? "";
                 if (templateId) insertTaskInEpisode(episode.id, workflowId, "New Task", 0, templateId);
@@ -1277,7 +1283,7 @@ export function EpisodeDetail({
                 const fkTemplateId = tasks[0]?.task_template_id ?? templateId;
                 await duplicateTaskToEpisode(templateId, episode.id, workflowId, fkTemplateId, 0);
               }}
-            />
+            />}
           </div>
         ) : (
           <SortableList
@@ -1293,7 +1299,7 @@ export function EpisodeDetail({
             <SortableItem key={task.id} id={task.id}>
               {({ dragHandleProps, isDragging: isTaskDragging }) => (
             <div>
-              {taskIndex > 0 && (
+              {taskIndex > 0 && isAdminUser && (
                 <>
                   <div className="flex items-center justify-center py-1">
                     <div className="h-4 w-px bg-border" />
@@ -1376,6 +1382,7 @@ export function EpisodeDetail({
               taskTemplatesForRules={taskTemplatesForRules}
               dragHandleProps={dragHandleProps}
               isTaskDragging={isTaskDragging}
+              isAdminUser={isAdminUser}
             />
             </div>
               )}
@@ -1385,7 +1392,7 @@ export function EpisodeDetail({
         )}
       </div>
 
-      {orderedTasks.length > 0 && (
+      {orderedTasks.length > 0 && isAdminUser && (
         <div className="flex items-center justify-center py-2">
           <InsertTaskButton
             size="icon"

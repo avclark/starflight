@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardTasks } from "./dashboard-tasks";
 import Link from "next/link";
-import { ClientDate } from "@/components/client-date";
+import { ClientDate, ClientDateRange } from "@/components/client-date";
 import { ShowAvatar } from "@/components/show-avatar";
 import type { Tables } from "@/lib/types/database";
 
@@ -15,7 +15,6 @@ export default async function DashboardPage() {
   let episodes: Tables<"episodes">[] = [];
 
   if (userId) {
-    // Find episodes where the current user has at least one task assigned
     const { data: userTasks } = await supabase
       .from("tasks")
       .select("episode_id")
@@ -44,7 +43,6 @@ export default async function DashboardPage() {
     episodes = data ?? [];
   }
 
-  // Fetch related shows and workflows for display
   const showIds = [...new Set(episodes.map((e) => e.show_id))];
   const workflowIds = [...new Set(episodes.map((e) => e.workflow_id))];
 
@@ -59,7 +57,6 @@ export default async function DashboardPage() {
   const showAvatarMap = new Map((shows ?? []).map((s) => [s.id, s.avatar_url]));
   const workflowMap = new Map((workflows ?? []).map((w) => [w.id, w.name]));
 
-  // Fetch tasks — filtered by current user
   let tasksQuery = supabase
     .from("tasks")
     .select("*")
@@ -72,9 +69,8 @@ export default async function DashboardPage() {
 
   const { data: tasks } = await tasksQuery
     .order("due_date", { ascending: true, nullsFirst: false })
-    .limit(20);
+    .limit(10);
 
-  // Fetch episode info for tasks
   const taskEpisodeIds = [...new Set((tasks ?? []).map((t) => t.episode_id))];
   const { data: taskEpisodes } = taskEpisodeIds.length
     ? await supabase
@@ -91,8 +87,16 @@ export default async function DashboardPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>My Episodes</CardTitle>
+            {userId && (
+              <Link
+                href={`/people/${userId}?tab=episodes`}
+                className="text-xs text-muted-foreground hover:underline"
+              >
+                View all episodes →
+              </Link>
+            )}
           </CardHeader>
           <CardContent>
             {episodes.length === 0 ? (
@@ -143,8 +147,16 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>My Tasks</CardTitle>
+            {userId && (
+              <Link
+                href={`/people/${userId}?tab=tasks`}
+                className="text-xs text-muted-foreground hover:underline"
+              >
+                View all tasks →
+              </Link>
+            )}
           </CardHeader>
           <CardContent>
             <DashboardTasks

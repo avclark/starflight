@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/require-admin";
 import { ProcessHeader } from "./process-header";
 import { TaskTemplateList } from "./task-template-list";
 
@@ -8,6 +9,7 @@ export default async function ProcessDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdmin();
   const { id } = await params;
   const supabase = await createClient();
 

@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/require-admin";
 import { ProcessesTable } from "./processes-table";
 
 export default async function ProcessesPage() {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: processes } = await supabase
     .from("processes")

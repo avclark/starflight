@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,8 +63,10 @@ const NONE_VALUE = "__none__";
 
 export function PersonProfile({
   person,
+  canEditRole = false,
 }: {
   person: Tables<"users">;
+  canEditRole?: boolean;
 }) {
   const [firstName, setFirstName] = useState(
     person.first_name ?? person.full_name.split(" ")[0] ?? ""
@@ -77,6 +77,7 @@ export function PersonProfile({
   const [email, setEmail] = useState(person.email);
   const [timezone, setTimezone] = useState(person.timezone ?? "");
   const [avatarUrl, setAvatarUrl] = useState(person.avatar_url);
+  const [role, setRole] = useState(person.role);
   const [saving, setSaving] = useState(false);
 
   const displayName = `${firstName} ${lastName}`.trim();
@@ -88,6 +89,7 @@ export function PersonProfile({
       last_name: lastName,
       email,
       timezone: timezone || null,
+      ...(canEditRole ? { role } : {}),
     });
     setSaving(false);
     if (result.error) {
@@ -98,27 +100,7 @@ export function PersonProfile({
   }
 
   return (
-    <div className="space-y-6 max-w-lg">
-      <div className="flex items-center gap-3">
-        <Link href="/people">
-          <Button variant="ghost" size="icon-sm">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <UserAvatar
-          name={displayName || person.email}
-          avatarUrl={avatarUrl}
-          size="lg"
-        />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {displayName || "New Person"}
-          </h1>
-          <p className="text-sm text-muted-foreground">{email}</p>
-        </div>
-      </div>
-
-      <div className="space-y-4">
+    <div className="space-y-4 max-w-lg">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="first_name">First Name</Label>
@@ -168,6 +150,21 @@ export function PersonProfile({
           </Select>
         </div>
 
+        {canEditRole && (
+          <div className="space-y-2">
+            <Label htmlFor="role">Role</Label>
+            <Select value={role} onValueChange={(v: "admin" | "user") => setRole(v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">User</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label>Avatar</Label>
           <div className="flex items-center gap-4">
@@ -209,7 +206,6 @@ export function PersonProfile({
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save Profile"}
         </Button>
-      </div>
     </div>
   );
 }

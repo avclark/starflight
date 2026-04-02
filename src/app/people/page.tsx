@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/require-admin";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeopleTable } from "./people-table";
 import { RolesTab } from "./roles-tab";
 
 export default async function PeoplePage() {
+  await requireAdmin();
   const supabase = await createClient();
 
   const { data: people } = await supabase

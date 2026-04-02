@@ -53,3 +53,7 @@ export async function getCurrentUser(): Promise<Tables<"users"> | null> {
 
   return newUser;
 }
+
+export function isAdmin(user: Tables<"users"> | null): boolean {
+  return user?.role === "admin";
+}

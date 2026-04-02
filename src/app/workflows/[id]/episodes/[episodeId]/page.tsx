@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { EpisodeDetail } from "./episode-detail";
 
 export default async function EpisodeDetailPage({
@@ -207,6 +208,7 @@ export default async function EpisodeDetailPage({
       showRoleAssignments={showRoleAssignments ?? []}
       dateRules={dateRules ?? []}
       taskTemplatesForRules={taskTemplatesForRules ?? []}
+      isAdminUser={isAdmin(await getCurrentUser())}
     />
   );
 }

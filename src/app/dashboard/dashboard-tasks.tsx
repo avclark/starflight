@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { isPast } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClientDate } from "@/components/client-date";
+import { ClientDateRange } from "@/components/client-date";
 import { completeTask, uncompleteTask } from "@/lib/actions/episodes";
 import type { Tables } from "@/lib/types/database";
 
@@ -61,16 +61,16 @@ export function DashboardTasks({ tasks }: { tasks: TaskWithEpisode[] }) {
                 {task.episode?.title ?? "Unknown episode"}
               </p>
             </div>
-            {task.due_date && (
-              <ClientDate
-                date={task.due_date}
-                className={`text-xs tabular-nums shrink-0 ${
-                  overdue
-                    ? "text-destructive font-medium"
-                    : "text-muted-foreground"
-                }`}
-              />
-            )}
+            <ClientDateRange
+              startDate={task.start_date}
+              dueDate={task.due_date}
+              dateOnly
+              className={`text-xs tabular-nums shrink-0 ${
+                overdue
+                  ? "text-destructive font-medium"
+                  : "text-muted-foreground"
+              }`}
+            />
           </div>
         );
       })}
