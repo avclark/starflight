@@ -20,6 +20,7 @@ export interface Database {
           timezone: string | null;
           auth_id: string | null;
           role: "admin" | "user";
+          slack_webhook_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -32,6 +33,7 @@ export interface Database {
           timezone?: string | null;
           auth_id?: string | null;
           role?: "admin" | "user";
+          slack_webhook_url?: string | null;
           created_at?: string;
         };
         Update: {
@@ -44,6 +46,7 @@ export interface Database {
           timezone?: string | null;
           auth_id?: string | null;
           role?: "admin" | "user";
+          slack_webhook_url?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -558,6 +561,7 @@ export interface Database {
           instance_email_template: Json | null;
           instance_dependencies: Json;
           instance_visibility_rules: Json | null;
+          notifications_sent: Json;
           created_at: string;
           updated_at: string;
         };
@@ -581,6 +585,7 @@ export interface Database {
           instance_email_template?: Json | null;
           instance_dependencies?: Json;
           instance_visibility_rules?: Json | null;
+          notifications_sent?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -604,6 +609,7 @@ export interface Database {
           instance_email_template?: Json | null;
           instance_dependencies?: Json;
           instance_visibility_rules?: Json | null;
+          notifications_sent?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -723,6 +729,45 @@ export interface Database {
           link?: string | null;
           read?: boolean;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: {
+          id: string;
+          user_id: string;
+          on_task_assigned: boolean;
+          on_task_starting: boolean;
+          on_task_due: boolean;
+          on_comment_mention: boolean;
+          email_on_task_assigned: boolean;
+          email_on_task_starting: boolean;
+          email_on_task_due: boolean;
+          email_on_comment_mention: boolean;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          on_task_assigned?: boolean;
+          on_task_starting?: boolean;
+          on_task_due?: boolean;
+          on_comment_mention?: boolean;
+          email_on_task_assigned?: boolean;
+          email_on_task_starting?: boolean;
+          email_on_task_due?: boolean;
+          email_on_comment_mention?: boolean;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          on_task_assigned?: boolean;
+          on_task_starting?: boolean;
+          on_task_due?: boolean;
+          on_comment_mention?: boolean;
+          email_on_task_assigned?: boolean;
+          email_on_task_starting?: boolean;
+          email_on_task_due?: boolean;
+          email_on_comment_mention?: boolean;
         };
         Relationships: [];
       };

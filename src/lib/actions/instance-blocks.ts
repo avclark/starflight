@@ -358,6 +358,17 @@ export async function saveTaskInstanceOverrides(
     updates.instance_email_template = overrides.instance_email_template;
   }
 
+  // Get previous assigned user before updating (for notification logic)
+  let previousAssignedUserId: string | null = null;
+  if (overrides.assigned_user_id !== undefined) {
+    const { data: currentTask } = await supabase
+      .from("tasks")
+      .select("assigned_user_id, title, episode_id")
+      .eq("id", taskId)
+      .single();
+    previousAssignedUserId = currentTask?.assigned_user_id ?? null;
+  }
+
   if (Object.keys(updates).length > 0) {
     const { error } = await supabase
       .from("tasks")
@@ -365,6 +376,39 @@ export async function saveTaskInstanceOverrides(
       .eq("id", taskId);
 
     if (error) return { error: error.message };
+  }
+
+  // Notify newly assigned user (only if assignment actually changed to a new person)
+  if (
+    overrides.assigned_user_id &&
+    overrides.assigned_user_id !== previousAssignedUserId
+  ) {
+    const { data: task } = await supabase
+      .from("tasks")
+      .select("title, episode_id")
+      .eq("id", taskId)
+      .single();
+
+    const { data: episode } = await supabase
+      .from("episodes")
+      .select("title")
+      .eq("id", episodeId)
+      .single();
+
+    if (task && episode) {
+      const { notify } = await import("@/lib/notify");
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+      const link = `/workflows/${workflowId}/episodes/${episodeId}`;
+      await notify({
+        userId: overrides.assigned_user_id,
+        type: "task_assigned",
+        title: `New task assigned: ${task.title}`,
+        body: `You've been assigned "${task.title}" in episode "${episode.title}".`,
+        link,
+        emailSubject: `Task assigned: ${task.title}`,
+        emailBody: `<p>You've been assigned a new task:</p><p><strong>${task.title}</strong></p><p>Episode: ${episode.title}</p><p><a href="${siteUrl}${link}" class="btn">View Task</a></p>`,
+      });
+    }
   }
 
   revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);

@@ -84,6 +84,13 @@ export default async function PersonProfilePage({
     .order("created_at", { ascending: false })
     .limit(100);
 
+  // Notification preferences
+  const { data: notifPrefs } = await supabase
+    .from("notification_preferences")
+    .select("*")
+    .eq("user_id", id)
+    .maybeSingle();
+
   return (
     <PersonPageTabs
       person={person}
@@ -103,6 +110,8 @@ export default async function PersonProfilePage({
       roleShows={roleShows ?? []}
       roles={roles ?? []}
       notifications={notifications ?? []}
+      notifPrefs={notifPrefs}
+      slackWebhookUrl={person.slack_webhook_url}
     />
   );
 }

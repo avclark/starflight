@@ -244,14 +244,57 @@ export async function createEpisode(
     // Send notifications for assigned tasks
     const assignedTasks = tasks.filter((t) => t.assigned_user_id && t.is_visible);
     if (assignedTasks.length > 0) {
-      const notifications = assignedTasks.map((t) => ({
-        user_id: t.assigned_user_id!,
-        type: "task_assigned",
-        title: `New task assigned: ${t.title}`,
-        body: `You've been assigned "${t.title}" in episode "${title}".`,
-        link: `/workflows/${workflowId}/episodes/${episode.id}`,
-      }));
-      await supabase.from("notifications").insert(notifications);
+      const { notify, isEmailEnabledForUser } = await import("@/lib/notify");
+      const { sendEmail, buildEmailHtml } = await import("@/lib/email");
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+      const link = `/workflows/${workflowId}/episodes/${episode.id}`;
+
+      // Group tasks by assigned user
+      const tasksByUser = new Map<string, string[]>();
+      for (const t of assignedTasks) {
+        const uid = t.assigned_user_id!;
+        if (!tasksByUser.has(uid)) tasksByUser.set(uid, []);
+        tasksByUser.get(uid)!.push(t.title);
+      }
+
+      // Send individual in-app notifications (skip email — we'll send grouped emails below)
+      for (const t of assignedTasks) {
+        await notify({
+          userId: t.assigned_user_id!,
+          type: "task_assigned",
+          title: `New task assigned: ${t.title}`,
+          body: `You've been assigned "${t.title}" in episode "${title}".`,
+          link,
+          skipEmail: true,
+        });
+      }
+
+      // Send one grouped email per user
+      for (const [uid, taskTitles] of tasksByUser) {
+        const emailOk = await isEmailEnabledForUser(uid, "task_assigned");
+        if (!emailOk) continue;
+
+        const { data: user } = await supabase
+          .from("users")
+          .select("email")
+          .eq("id", uid)
+          .single();
+        if (!user?.email) continue;
+
+        const count = taskTitles.length;
+        const taskList = taskTitles.map((t) => `<li>${t}</li>`).join("");
+
+        const emailSubject = count === 1
+          ? `Task assigned: ${taskTitles[0]}`
+          : `You've been assigned ${count} tasks in ${title}`;
+
+        const emailBody = count === 1
+          ? `<p>You've been assigned a new task:</p><p><strong>${taskTitles[0]}</strong></p><p>Episode: ${title}</p><p><a href="${siteUrl}${link}" class="btn">View Task</a></p>`
+          : `<p>You've been assigned ${count} tasks in <strong>${title}</strong>:</p><ul>${taskList}</ul><p><a href="${siteUrl}${link}" class="btn">View Episode</a></p>`;
+
+        const html = buildEmailHtml({ body: emailBody, preheader: emailSubject });
+        await sendEmail({ to: user.email, subject: emailSubject, html });
+      }
     }
   }
 

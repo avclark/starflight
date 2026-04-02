@@ -12,6 +12,7 @@ import { ClientDate, ClientDateRange } from "@/components/client-date";
 import { ShowAvatar } from "@/components/show-avatar";
 import { UserAvatar } from "@/components/user-avatar";
 import { NotificationsList } from "@/app/notifications/notifications-list";
+import { NotificationPrefs } from "./notification-prefs";
 import { PersonProfile } from "./person-profile";
 import { completeTask, uncompleteTask } from "@/lib/actions/episodes";
 import type { Tables } from "@/lib/types/database";
@@ -37,6 +38,8 @@ export function PersonPageTabs({
   roleShows,
   roles,
   notifications,
+  notifPrefs,
+  slackWebhookUrl,
 }: {
   person: Tables<"users">;
   defaultTab: string;
@@ -50,6 +53,8 @@ export function PersonPageTabs({
   roleShows: Show[];
   roles: Role[];
   notifications: Notification[];
+  notifPrefs: Tables<"notification_preferences"> | null;
+  slackWebhookUrl: string | null;
 }) {
   const showMap = new Map(shows.map((s) => [s.id, s]));
   const workflowMap = new Map(workflows.map((w) => [w.id, w.name]));
@@ -101,6 +106,7 @@ export function PersonPageTabs({
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
         </TabsList>
 
@@ -225,6 +231,15 @@ export function PersonPageTabs({
         {/* Notifications tab */}
         <TabsContent value="notifications" className="mt-4">
           <NotificationsList notifications={notifications} />
+        </TabsContent>
+
+        {/* Settings tab */}
+        <TabsContent value="settings" className="mt-4">
+          <NotificationPrefs
+            userId={person.id}
+            initialPrefs={notifPrefs}
+            slackWebhookUrl={slackWebhookUrl}
+          />
         </TabsContent>
 
         {/* Profile tab */}

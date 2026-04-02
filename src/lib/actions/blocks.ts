@@ -195,6 +195,34 @@ export async function postComment(
 
   if (error) return { error: error.message };
 
+  // Notify @mentioned users
+  const mentions = body.match(/@\[([^\]]+)\]/g);
+  if (mentions && mentions.length > 0) {
+    const mentionedNames = mentions.map((m) => m.slice(2, -1));
+    const { data: mentionedUsers } = await supabase
+      .from("users")
+      .select("id, full_name")
+      .in("full_name", mentionedNames);
+
+    if (mentionedUsers && mentionedUsers.length > 0) {
+      const { notify } = await import("@/lib/notify");
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+      const link = `/workflows/${workflowId}/episodes/${episodeId}`;
+      for (const mentioned of mentionedUsers) {
+        if (mentioned.id === userId) continue; // Don't notify yourself
+        await notify({
+          userId: mentioned.id,
+          type: "comment_mention",
+          title: `${currentUser.full_name} mentioned you in a comment`,
+          body: body.trim().substring(0, 100),
+          link,
+          emailSubject: `${currentUser.full_name} mentioned you`,
+          emailBody: `<p><strong>${currentUser.full_name}</strong> mentioned you in a comment:</p><p>${body.trim()}</p><p><a href="${siteUrl}${link}" class="btn">View Comment</a></p>`,
+        });
+      }
+    }
+  }
+
   revalidatePath(`/workflows/${workflowId}/episodes/${episodeId}`);
   return { success: true };
 }

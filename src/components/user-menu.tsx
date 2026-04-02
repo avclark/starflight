@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, User } from "lucide-react";
+import { Bell, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -62,6 +62,13 @@ export function UserMenu({
         >
           <User className="mr-2 h-4 w-4" />
           My Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() => navigateTo(`/people/${user.id}?tab=settings`)}
+        >
+          <Bell className="mr-2 h-4 w-4" />
+          Notification Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

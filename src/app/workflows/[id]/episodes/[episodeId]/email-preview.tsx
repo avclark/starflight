@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { sendTaskEmail } from "@/lib/actions/send-email";
 import { completeTask } from "@/lib/actions/episodes";
 import { saveEmailBodyOverride } from "@/lib/actions/blocks";
 import type { Tables, Json } from "@/lib/types/database";
@@ -239,13 +240,17 @@ export function EmailPreview({
     toast("Message body copied to clipboard");
   }
 
-  function handleSend() {
-    console.log("Email sent:", {
-      from: emailTemplate.from_name,
+  async function handleSend() {
+    const result = await sendTaskEmail({
+      fromName: emailTemplate.from_name,
       subject: resolvedSubject,
       body: resolvedBody,
     });
-    toast("Email sent");
+    if (result.success) {
+      toast("Email sent");
+    } else {
+      toast(`Email failed: ${result.error}`);
+    }
   }
 
   async function handleSendAndComplete() {
