@@ -172,7 +172,7 @@ export function PersonPageTabs({
                     <div className="min-w-0 flex-1">
                       {ep ? (
                         <Link
-                          href={`/workflows/${ep.workflow_id}/episodes/${ep.id}`}
+                          href={`/workflows/${ep.workflow_id}/episodes/${ep.id}#task-${task.id}`}
                           className="text-sm font-medium hover:underline truncate block"
                         >
                           {task.title}

@@ -47,7 +47,7 @@ export function DashboardTasks({ tasks }: { tasks: TaskWithEpisode[] }) {
             <div className="min-w-0 flex-1">
               {task.episode ? (
                 <Link
-                  href={`/workflows/${task.episode.workflow_id}/episodes/${task.episode.id}`}
+                  href={`/workflows/${task.episode.workflow_id}/episodes/${task.episode.id}#task-${task.id}`}
                   className="text-sm font-medium hover:underline truncate block"
                 >
                   {task.title}

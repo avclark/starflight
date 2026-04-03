@@ -398,7 +398,7 @@ export async function saveTaskInstanceOverrides(
     if (task && episode) {
       const { notify } = await import("@/lib/notify");
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-      const link = `/workflows/${workflowId}/episodes/${episodeId}`;
+      const link = `/workflows/${workflowId}/episodes/${episodeId}#task-${taskId}`;
       await notify({
         userId: overrides.assigned_user_id,
         type: "task_assigned",

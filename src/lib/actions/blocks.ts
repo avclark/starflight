@@ -207,7 +207,7 @@ export async function postComment(
     if (mentionedUsers && mentionedUsers.length > 0) {
       const { notify } = await import("@/lib/notify");
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-      const link = `/workflows/${workflowId}/episodes/${episodeId}`;
+      const link = `/workflows/${workflowId}/episodes/${episodeId}#task-${taskId}`;
       for (const mentioned of mentionedUsers) {
         if (mentioned.id === userId) continue; // Don't notify yourself
         await notify({

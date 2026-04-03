@@ -238,39 +238,43 @@ export async function createEpisode(
       }
     }
 
-    const { error: tasksError } = await supabase.from("tasks").insert(tasks);
+    const { data: insertedTasks, error: tasksError } = await supabase
+      .from("tasks")
+      .insert(tasks)
+      .select("id, title, position, assigned_user_id, is_visible");
     if (tasksError) return { error: tasksError.message };
 
     // Send notifications for assigned tasks
-    const assignedTasks = tasks.filter((t) => t.assigned_user_id && t.is_visible);
-    if (assignedTasks.length > 0) {
+    const assignedInserted = (insertedTasks ?? []).filter((t) => t.assigned_user_id && t.is_visible);
+    if (assignedInserted.length > 0) {
       const { notify, isEmailEnabledForUser } = await import("@/lib/notify");
       const { sendEmail, buildEmailHtml } = await import("@/lib/email");
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-      const link = `/workflows/${workflowId}/episodes/${episode.id}`;
+      const episodeLink = `/workflows/${workflowId}/episodes/${episode.id}`;
 
-      // Group tasks by assigned user
-      const tasksByUser = new Map<string, string[]>();
-      for (const t of assignedTasks) {
+      // Group tasks by assigned user (with IDs for task-specific links)
+      const tasksByUser = new Map<string, { id: string; title: string }[]>();
+      for (const t of assignedInserted) {
         const uid = t.assigned_user_id!;
         if (!tasksByUser.has(uid)) tasksByUser.set(uid, []);
-        tasksByUser.get(uid)!.push(t.title);
+        tasksByUser.get(uid)!.push({ id: t.id, title: t.title });
       }
 
       // Send individual in-app notifications (skip email — we'll send grouped emails below)
-      for (const t of assignedTasks) {
+      for (const t of assignedInserted) {
+        const taskLink = `${episodeLink}#task-${t.id}`;
         await notify({
           userId: t.assigned_user_id!,
           type: "task_assigned",
           title: `New task assigned: ${t.title}`,
           body: `You've been assigned "${t.title}" in episode "${title}".`,
-          link,
+          link: taskLink,
           skipEmail: true,
         });
       }
 
       // Send one grouped email per user
-      for (const [uid, taskTitles] of tasksByUser) {
+      for (const [uid, userTasks] of tasksByUser) {
         const emailOk = await isEmailEnabledForUser(uid, "task_assigned");
         if (!emailOk) continue;
 
@@ -281,16 +285,15 @@ export async function createEpisode(
           .single();
         if (!user?.email) continue;
 
-        const count = taskTitles.length;
-        const taskList = taskTitles.map((t) => `<li>${t}</li>`).join("");
+        const count = userTasks.length;
 
         const emailSubject = count === 1
-          ? `Task assigned: ${taskTitles[0]}`
+          ? `Task assigned: ${userTasks[0].title}`
           : `You've been assigned ${count} tasks in ${title}`;
 
         const emailBody = count === 1
-          ? `<p>You've been assigned a new task:</p><p><strong>${taskTitles[0]}</strong></p><p>Episode: ${title}</p><p><a href="${siteUrl}${link}" class="btn">View Task</a></p>`
-          : `<p>You've been assigned ${count} tasks in <strong>${title}</strong>:</p><ul>${taskList}</ul><p><a href="${siteUrl}${link}" class="btn">View Episode</a></p>`;
+          ? `<p>You've been assigned a new task:</p><p><strong>${userTasks[0].title}</strong></p><p>Episode: ${title}</p><p><a href="${siteUrl}${episodeLink}#task-${userTasks[0].id}" class="btn">View Task</a></p>`
+          : `<p>You've been assigned ${count} tasks in <strong>${title}</strong>:</p><ul>${userTasks.map((t) => `<li>${t.title}</li>`).join("")}</ul><p><a href="${siteUrl}${episodeLink}" class="btn">View Episode</a></p>`;
 
         const html = buildEmailHtml({ body: emailBody, preheader: emailSubject });
         await sendEmail({ to: user.email, subject: emailSubject, html });

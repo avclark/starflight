@@ -99,7 +99,7 @@ export async function GET(request: Request) {
 
     const prefs = prefsMap.get(task.assigned_user_id!);
     const today = todayInTimezone(user.timezone);
-    const link = `/workflows/${episode.workflow_id}/episodes/${task.episode_id}`;
+    const link = `/workflows/${episode.workflow_id}/episodes/${task.episode_id}#task-${task.id}`;
 
     // --- Start date notification ---
     if (task.start_date && !sent.start_sent && dateOnly(task.start_date) === today) {

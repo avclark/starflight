@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ type Notification = {
 };
 
 export function NotificationBell({ userId }: { userId: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -117,13 +120,28 @@ export function NotificationBell({ userId }: { userId: string }) {
                 className="border-b last:border-b-0 px-3 py-2 bg-accent/30"
               >
                 {n.link ? (
-                  <Link
+                  <a
                     href={n.link}
-                    className="text-sm font-medium hover:underline block"
-                    onClick={() => setOpen(false)}
+                    className="text-sm font-medium hover:underline block cursor-pointer"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      setOpen(false);
+                      if (!n.read) {
+                        markNotificationsRead([n.id]);
+                        setNotifications((prev) => prev.filter((x) => x.id !== n.id));
+                        setUnreadCount((c) => Math.max(0, c - 1));
+                      }
+                      const linkPath = n.link!.split("#")[0];
+                      const hash = n.link!.includes("#") ? "#" + n.link!.split("#")[1] : "";
+                      if (linkPath === pathname && hash) {
+                        window.location.hash = hash;
+                      } else {
+                        window.location.href = n.link!;
+                      }
+                    }}
                   >
                     {n.title}
-                  </Link>
+                  </a>
                 ) : (
                   <p className="text-sm font-medium">{n.title}</p>
                 )}

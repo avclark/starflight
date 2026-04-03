@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ClientDateRange } from "@/components/client-date";
@@ -125,6 +125,9 @@ function TaskRow({
   dragHandleProps: taskDragHandleProps,
   isAdminUser = false,
   isTaskDragging,
+  initialExpanded = false,
+  highlighted = false,
+  focusVersion = 0,
 }: {
   task: Task;
   workflowId: string;
@@ -157,8 +160,26 @@ function TaskRow({
   dragHandleProps?: Record<string, unknown>;
   isTaskDragging?: boolean;
   isAdminUser?: boolean;
+  initialExpanded?: boolean;
+  highlighted?: boolean;
+  focusVersion?: number;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initialExpanded ?? false);
+  const [showHighlight, setShowHighlight] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // React to external expansion trigger (e.g., hash fragment read after mount)
+  useEffect(() => {
+    if (highlighted) {
+      setExpanded(true);
+      setShowHighlight(true);
+      const scrollTimer = setTimeout(() => {
+        rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+      const fadeTimer = setTimeout(() => setShowHighlight(false), 2500);
+      return () => { clearTimeout(scrollTimer); clearTimeout(fadeTimer); };
+    }
+  }, [highlighted, focusVersion]);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -352,7 +373,11 @@ function TaskRow({
 
   return (
     <>
-      <div className={`rounded-lg border bg-card ${isTaskDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}>
+      <div
+        ref={rowRef}
+        id={`task-${task.id}`}
+        className={`rounded-lg border bg-card ${isTaskDragging ? "shadow-lg ring-2 ring-primary/20" : ""} ${showHighlight ? "animate-task-highlight" : ""}`}
+      >
         <div
           className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 cursor-pointer rounded-t-lg"
           onClick={() => setExpanded(!expanded)}
@@ -1221,6 +1246,25 @@ export function EpisodeDetail({
     blocks: allTokenBlocks,
   });
 
+  // Read hash fragment to auto-expand and highlight a specific task.
+  // focusVersion increments on each hash read so re-clicking the same task re-triggers.
+  const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
+  const [focusVersion, setFocusVersion] = useState(0);
+
+  useEffect(() => {
+    function readHash() {
+      const hash = window.location.hash;
+      const match = hash.match(/^#task-(.+)$/);
+      if (match) {
+        setFocusedTaskId(match[1]);
+        setFocusVersion((v) => v + 1);
+      }
+    }
+    readHash();
+    window.addEventListener("hashchange", readHash);
+    return () => window.removeEventListener("hashchange", readHash);
+  }, []);
+
   const [localTaskOrder, setLocalTaskOrder] = useState<string[] | null>(null);
   const orderedTasks = localTaskOrder
     ? localTaskOrder.map((id) => tasks.find((t) => t.id === id)).filter(Boolean) as Task[]
@@ -1383,6 +1427,9 @@ export function EpisodeDetail({
               dragHandleProps={dragHandleProps}
               isTaskDragging={isTaskDragging}
               isAdminUser={isAdminUser}
+              initialExpanded={focusedTaskId === task.id}
+              highlighted={focusedTaskId === task.id}
+              focusVersion={focusedTaskId === task.id ? focusVersion : 0}
             />
             </div>
               )}

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClientDate } from "@/components/client-date";
@@ -41,12 +40,17 @@ export function NotificationsList({
         >
           <div className="flex-1 min-w-0">
             {n.link ? (
-              <Link
+              <a
                 href={n.link}
-                className="text-sm font-medium hover:underline"
+                className="text-sm font-medium hover:underline cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (!n.read) markNotificationsRead([n.id]);
+                  window.location.href = n.link!;
+                }}
               >
                 {n.title}
-              </Link>
+              </a>
             ) : (
               <p className="text-sm font-medium">{n.title}</p>
             )}
