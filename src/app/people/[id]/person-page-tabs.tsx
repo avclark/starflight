@@ -1,7 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { isPast } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -61,15 +61,14 @@ export function PersonPageTabs({
   const episodeMap = new Map(taskEpisodes.map((e) => [e.id, e]));
   const roleMap = new Map(roles.map((r) => [r.id, r.name]));
 
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab") || defaultTab;
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   function handleTabChange(tab: string) {
-    const params = new URLSearchParams(searchParams);
-    params.set("tab", tab);
-    router.replace(`${pathname}?${params.toString()}`);
+    setActiveTab(tab);
+    // Update URL for bookmarkability without triggering a server re-render
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url.toString());
   }
 
   return (

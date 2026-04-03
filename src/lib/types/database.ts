@@ -776,7 +776,16 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      create_episode_with_tasks: {
+        Args: {
+          p_workflow_id: string;
+          p_process_id: string;
+          p_show_id: string;
+          p_title: string;
+          p_created_by_user_id?: string | null;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       [_ in never]: never;

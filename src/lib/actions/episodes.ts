@@ -49,260 +49,80 @@ export async function createEpisode(
 
   const supabase = await createClient();
 
-  // Insert the episode
-  const { data: episode, error: episodeError } = await supabase
-    .from("episodes")
-    .insert({
-      workflow_id: workflowId,
-      process_id: processId,
-      show_id: showId,
-      title,
-      status: "active",
-      progress_percent: 0,
-    })
-    .select("id")
-    .single();
+  // Call the Postgres function — creates episode + tasks in a single transaction
+  const { data: result, error: rpcError } = await supabase.rpc(
+    "create_episode_with_tasks",
+    {
+      p_workflow_id: workflowId,
+      p_process_id: processId,
+      p_show_id: showId,
+      p_title: title,
+    }
+  );
 
-  if (episodeError || !episode) return { error: episodeError?.message ?? "Failed to create episode" };
+  if (rpcError) return { error: rpcError.message };
 
-  // Fetch task templates with all fields needed for creation
-  const { data: templates } = await supabase
-    .from("task_templates")
-    .select("id, title, position, assignment_mode, assigned_role_id, assigned_user_id, visibility_logic")
-    .eq("process_id", processId)
-    .order("position");
+  const episodeId = (result as { episode_id: string }).episode_id;
+  const createdTasks = ((result as { tasks: { id: string; title: string; assigned_user_id: string | null; is_visible: boolean }[] }).tasks) ?? [];
 
-  if (templates && templates.length > 0) {
-    // Fetch show role assignments for role-based resolution
-    const { data: showAssignments } = await supabase
-      .from("show_role_assignments")
-      .select("role_id, user_id")
-      .eq("show_id", showId);
+  // Send notifications for assigned tasks
+  const assignedTasks = createdTasks.filter((t) => t.assigned_user_id && t.is_visible);
+  if (assignedTasks.length > 0) {
+    const { notify, isEmailEnabledForUser } = await import("@/lib/notify");
+    const { sendEmail, buildEmailHtml } = await import("@/lib/email");
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const episodeLink = `/workflows/${workflowId}/episodes/${episodeId}`;
 
-    const roleAssignmentMap = new Map(
-      (showAssignments ?? []).map((a) => [a.role_id, a.user_id])
-    );
-
-    // Fetch visibility rules for all templates in this process
-    const templateIds = templates.map((t) => t.id);
-    const { data: visRules } = await supabase
-      .from("task_template_visibility_rules")
-      .select("*")
-      .in("task_template_id", templateIds)
-      .eq("is_active", true);
-
-    // Fetch show setting values for visibility evaluation
-    const { data: settingValues } = await supabase
-      .from("show_setting_values")
-      .select("setting_definition_id, value_json")
-      .eq("show_id", showId);
-
-    const settingValueMap = new Map(
-      (settingValues ?? []).map((sv) => [sv.setting_definition_id, sv.value_json])
-    );
-
-    // Fetch dependencies
-    const { data: deps } = await supabase
-      .from("task_template_dependencies")
-      .select("task_template_id, depends_on_task_template_id")
-      .in("task_template_id", templateIds);
-
-    // Fetch date rules
-    const { data: dateRules } = await supabase
-      .from("task_template_date_rules")
-      .select("*")
-      .in("task_template_id", templateIds);
-
-    // Group date rules by template
-    const dateRulesByTemplate = new Map<string, typeof dateRules>();
-    for (const r of dateRules ?? []) {
-      const arr = dateRulesByTemplate.get(r.task_template_id) ?? [];
-      arr.push(r);
-      dateRulesByTemplate.set(r.task_template_id, arr);
+    // Group tasks by assigned user (with IDs for task-specific links)
+    const tasksByUser = new Map<string, { id: string; title: string }[]>();
+    for (const t of assignedTasks) {
+      const uid = t.assigned_user_id!;
+      if (!tasksByUser.has(uid)) tasksByUser.set(uid, []);
+      tasksByUser.get(uid)!.push({ id: t.id, title: t.title });
     }
 
-    // Group visibility rules and deps by template
-    const rulesByTemplate = new Map<string, typeof visRules>();
-    for (const r of visRules ?? []) {
-      const arr = rulesByTemplate.get(r.task_template_id) ?? [];
-      arr.push(r);
-      rulesByTemplate.set(r.task_template_id, arr);
-    }
-
-    const depsByTemplate = new Map<string, string[]>();
-    for (const d of deps ?? []) {
-      const arr = depsByTemplate.get(d.task_template_id) ?? [];
-      arr.push(d.depends_on_task_template_id);
-      depsByTemplate.set(d.task_template_id, arr);
-    }
-
-    // Evaluate visibility for each template
-    const visibilityMap = new Map<string, boolean>();
-    for (const t of templates) {
-      const rules = rulesByTemplate.get(t.id);
-      if (!rules || rules.length === 0) {
-        visibilityMap.set(t.id, true);
-        continue;
-      }
-
-      const results = rules.map((rule) => {
-        const value = settingValueMap.get(rule.setting_definition_id);
-        return evaluateRule(rule.operator, value, rule.target_value);
+    // Send individual in-app notifications (skip email — we'll send grouped emails below)
+    for (const t of assignedTasks) {
+      const taskLink = `${episodeLink}#task-${t.id}`;
+      await notify({
+        userId: t.assigned_user_id!,
+        type: "task_assigned",
+        title: `New task assigned: ${t.title}`,
+        body: `You've been assigned "${t.title}" in episode "${title}".`,
+        link: taskLink,
+        skipEmail: true,
       });
-
-      const logic = t.visibility_logic ?? "and";
-      const visible =
-        logic === "and"
-          ? results.every((r) => r)
-          : results.some((r) => r);
-
-      visibilityMap.set(t.id, visible);
     }
 
-    // Create task instances
-    const tasks = templates.map((t) => {
-      const isVisible = visibilityMap.get(t.id) ?? true;
+    // Send one grouped email per user
+    for (const [uid, userTasks] of tasksByUser) {
+      const emailOk = await isEmailEnabledForUser(uid, "task_assigned");
+      if (!emailOk) continue;
 
-      // Resolve assignment
-      let assignedUserId: string | null = null;
-      if (t.assignment_mode === "user") {
-        assignedUserId = t.assigned_user_id;
-      } else if (t.assignment_mode === "role" && t.assigned_role_id) {
-        assignedUserId = roleAssignmentMap.get(t.assigned_role_id) ?? null;
-      }
+      const { data: user } = await supabase
+        .from("users")
+        .select("email")
+        .eq("id", uid)
+        .single();
+      if (!user?.email) continue;
 
-      // Evaluate dependencies: blocked if any prerequisite is visible but not completed
-      let status: "open" | "blocked" = "open";
-      if (isVisible) {
-        const prereqIds = depsByTemplate.get(t.id) ?? [];
-        if (prereqIds.length > 0) {
-          // At creation time, no tasks are completed yet, so if any visible prereq exists → blocked
-          const hasVisiblePrereq = prereqIds.some(
-            (pid) => visibilityMap.get(pid) === true
-          );
-          if (hasVisiblePrereq) {
-            status = "blocked";
-          }
-        }
-      }
+      const count = userTasks.length;
 
-      return {
-        episode_id: episode.id,
-        task_template_id: t.id,
-        title: t.title,
-        position: t.position,
-        status,
-        is_visible: isVisible,
-        assigned_user_id: assignedUserId,
-        start_date: null as string | null,
-        due_date: null as string | null,
-      };
-    });
+      const emailSubject = count === 1
+        ? `Task assigned: ${userTasks[0].title}`
+        : `You've been assigned ${count} tasks in ${title}`;
 
-    // Calculate dates from rules
-    const episodeCreatedAt = new Date();
-    // Build a map of template_id → task (for cross-referencing dates)
-    const taskByTemplateId = new Map(tasks.map((t) => [t.task_template_id, t]));
+      const emailBody = count === 1
+        ? `<p>You've been assigned a new task:</p><p><strong>${userTasks[0].title}</strong></p><p>Episode: ${title}</p><p><a href="${siteUrl}${episodeLink}#task-${userTasks[0].id}" class="btn">View Task</a></p>`
+        : `<p>You've been assigned ${count} tasks in <strong>${title}</strong>:</p><ul>${userTasks.map((t) => `<li>${t.title}</li>`).join("")}</ul><p><a href="${siteUrl}${episodeLink}" class="btn">View Episode</a></p>`;
 
-    for (const task of tasks) {
-      const rules = dateRulesByTemplate.get(task.task_template_id);
-      if (!rules) continue;
-
-      for (const rule of rules) {
-        let baseDate: Date | null = null;
-
-        if (rule.relative_to === "episode_start") {
-          baseDate = episodeCreatedAt;
-        } else if (rule.relative_task_template_id) {
-          const refTask = taskByTemplateId.get(rule.relative_task_template_id);
-          if (refTask) {
-            const refDateStr =
-              rule.relative_to === "task_start"
-                ? refTask.start_date
-                : refTask.due_date;
-            if (refDateStr) baseDate = new Date(refDateStr);
-          }
-        }
-
-        if (baseDate) {
-          const calculated = new Date(baseDate);
-          calculated.setDate(calculated.getDate() + rule.offset_days);
-          calculated.setHours(calculated.getHours() + rule.offset_hours);
-
-          if (rule.date_field === "start_date") {
-            task.start_date = calculated.toISOString();
-          } else {
-            task.due_date = calculated.toISOString();
-          }
-        }
-      }
-    }
-
-    const { data: insertedTasks, error: tasksError } = await supabase
-      .from("tasks")
-      .insert(tasks)
-      .select("id, title, position, assigned_user_id, is_visible");
-    if (tasksError) return { error: tasksError.message };
-
-    // Send notifications for assigned tasks
-    const assignedInserted = (insertedTasks ?? []).filter((t) => t.assigned_user_id && t.is_visible);
-    if (assignedInserted.length > 0) {
-      const { notify, isEmailEnabledForUser } = await import("@/lib/notify");
-      const { sendEmail, buildEmailHtml } = await import("@/lib/email");
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-      const episodeLink = `/workflows/${workflowId}/episodes/${episode.id}`;
-
-      // Group tasks by assigned user (with IDs for task-specific links)
-      const tasksByUser = new Map<string, { id: string; title: string }[]>();
-      for (const t of assignedInserted) {
-        const uid = t.assigned_user_id!;
-        if (!tasksByUser.has(uid)) tasksByUser.set(uid, []);
-        tasksByUser.get(uid)!.push({ id: t.id, title: t.title });
-      }
-
-      // Send individual in-app notifications (skip email — we'll send grouped emails below)
-      for (const t of assignedInserted) {
-        const taskLink = `${episodeLink}#task-${t.id}`;
-        await notify({
-          userId: t.assigned_user_id!,
-          type: "task_assigned",
-          title: `New task assigned: ${t.title}`,
-          body: `You've been assigned "${t.title}" in episode "${title}".`,
-          link: taskLink,
-          skipEmail: true,
-        });
-      }
-
-      // Send one grouped email per user
-      for (const [uid, userTasks] of tasksByUser) {
-        const emailOk = await isEmailEnabledForUser(uid, "task_assigned");
-        if (!emailOk) continue;
-
-        const { data: user } = await supabase
-          .from("users")
-          .select("email")
-          .eq("id", uid)
-          .single();
-        if (!user?.email) continue;
-
-        const count = userTasks.length;
-
-        const emailSubject = count === 1
-          ? `Task assigned: ${userTasks[0].title}`
-          : `You've been assigned ${count} tasks in ${title}`;
-
-        const emailBody = count === 1
-          ? `<p>You've been assigned a new task:</p><p><strong>${userTasks[0].title}</strong></p><p>Episode: ${title}</p><p><a href="${siteUrl}${episodeLink}#task-${userTasks[0].id}" class="btn">View Task</a></p>`
-          : `<p>You've been assigned ${count} tasks in <strong>${title}</strong>:</p><ul>${userTasks.map((t) => `<li>${t.title}</li>`).join("")}</ul><p><a href="${siteUrl}${episodeLink}" class="btn">View Episode</a></p>`;
-
-        const html = buildEmailHtml({ body: emailBody, preheader: emailSubject });
-        await sendEmail({ to: user.email, subject: emailSubject, html });
-      }
+      const html = buildEmailHtml({ body: emailBody, preheader: emailSubject });
+      await sendEmail({ to: user.email, subject: emailSubject, html });
     }
   }
 
   revalidatePath(`/workflows/${workflowId}`);
-  return { success: true, episodeId: episode.id };
+  return { success: true, episodeId };
 }
 
 export async function renameEpisode(episodeId: string, workflowId: string, title: string) {

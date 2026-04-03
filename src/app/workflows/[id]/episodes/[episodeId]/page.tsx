@@ -11,166 +11,87 @@ export default async function EpisodeDetailPage({
   const { id: workflowId, episodeId } = await params;
   const supabase = await createClient();
 
-  const { data: episode } = await supabase
-    .from("episodes")
-    .select("*")
-    .eq("id", episodeId)
-    .single();
+  // Parallel batch 1: episode, tasks, current user, all people, roles, setting defs
+  const [
+    { data: episode },
+    { data: tasks },
+    currentUser,
+    { data: allPeople },
+    { data: roles },
+    { data: allSettingDefs },
+  ] = await Promise.all([
+    supabase.from("episodes").select("*").eq("id", episodeId).single(),
+    supabase.from("tasks").select("*").eq("episode_id", episodeId).eq("is_visible", true).order("position"),
+    getCurrentUser(),
+    supabase.from("users").select("id, full_name").order("full_name"),
+    supabase.from("roles").select("id, name").order("display_order"),
+    supabase.from("show_setting_definitions").select("id, label").order("display_order"),
+  ]);
 
   if (!episode) notFound();
 
-  const { data: show } = await supabase
-    .from("shows")
-    .select("name, avatar_url")
-    .eq("id", episode.show_id)
-    .single();
-
-  const { data: tasks } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("episode_id", episodeId)
-    .eq("is_visible", true)
-    .order("position");
-
-  // Fetch assigned user names
-  const assignedUserIds = [
-    ...new Set(
-      (tasks ?? [])
-        .map((t) => t.assigned_user_id)
-        .filter(Boolean) as string[]
-    ),
-  ];
-  const { data: assignedUsers } = assignedUserIds.length
-    ? await supabase
-        .from("users")
-        .select("id, full_name, avatar_url")
-        .in("id", assignedUserIds)
-    : { data: [] };
-  const userMap = Object.fromEntries(
-    (assignedUsers ?? []).map((u) => [u.id, u.full_name])
-  );
-  const userAvatarMap = Object.fromEntries(
-    (assignedUsers ?? []).map((u) => [u.id, u.avatar_url])
-  );
-
-  // Fetch template blocks for all task templates referenced by these tasks
-  const templateIds = [
-    ...new Set((tasks ?? []).map((t) => t.task_template_id)),
-  ];
-  const { data: templateBlocks } = templateIds.length
-    ? await supabase
-        .from("task_template_blocks")
-        .select("*")
-        .in("task_template_id", templateIds)
-        .order("display_order")
-    : { data: [] };
-
-  // Fetch date rules for task templates
-  const { data: dateRules } = templateIds.length
-    ? await supabase
-        .from("task_template_date_rules")
-        .select("*")
-        .in("task_template_id", templateIds)
-    : { data: [] };
-
-  // Fetch task templates for date rule display (need titles)
-  const { data: taskTemplatesForRules } = templateIds.length
-    ? await supabase
-        .from("task_templates")
-        .select("id, title")
-        .in("id", templateIds)
-    : { data: [] };
-
-  // Fetch instance blocks (episode-level blocks added to tasks)
+  // Collect IDs for dependent queries
+  const assignedUserIds = [...new Set((tasks ?? []).map((t) => t.assigned_user_id).filter(Boolean) as string[])];
+  const templateIds = [...new Set((tasks ?? []).map((t) => t.task_template_id))];
   const taskIds = (tasks ?? []).map((t) => t.id);
-  const { data: instanceBlocks } = taskIds.length
-    ? await supabase
-        .from("task_instance_blocks")
-        .select("*")
-        .in("task_id", taskIds)
-        .order("display_order")
+
+  // Parallel batch 2: everything that depends on episode/tasks
+  const [
+    { data: show },
+    { data: assignedUsers },
+    { data: templateBlocks },
+    { data: dateRules },
+    { data: taskTemplatesForRules },
+    { data: instanceBlocks },
+    { data: blockResponses },
+    { data: comments },
+    { data: showRoleAssignments },
+    { data: emailTemplates },
+    { data: showSettings },
+    { data: settingDefs },
+  ] = await Promise.all([
+    supabase.from("shows").select("name, avatar_url").eq("id", episode.show_id).single(),
+    assignedUserIds.length
+      ? supabase.from("users").select("id, full_name, avatar_url").in("id", assignedUserIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string; avatar_url: string | null }[] }),
+    templateIds.length
+      ? supabase.from("task_template_blocks").select("*").in("task_template_id", templateIds).order("display_order")
+      : Promise.resolve({ data: [] }),
+    templateIds.length
+      ? supabase.from("task_template_date_rules").select("*").in("task_template_id", templateIds)
+      : Promise.resolve({ data: [] }),
+    templateIds.length
+      ? supabase.from("task_templates").select("id, title").in("id", templateIds)
+      : Promise.resolve({ data: [] }),
+    taskIds.length
+      ? supabase.from("task_instance_blocks").select("*").in("task_id", taskIds).order("display_order")
+      : Promise.resolve({ data: [] }),
+    taskIds.length
+      ? supabase.from("task_block_responses").select("*").in("task_id", taskIds)
+      : Promise.resolve({ data: [] }),
+    taskIds.length
+      ? supabase.from("task_comments").select("*").in("task_id", taskIds).order("created_at")
+      : Promise.resolve({ data: [] }),
+    supabase.from("show_role_assignments").select("role_id, user_id").eq("show_id", episode.show_id),
+    templateIds.length
+      ? supabase.from("task_template_email_templates").select("*").in("task_template_id", templateIds)
+      : Promise.resolve({ data: [] }),
+    supabase.from("show_setting_values").select("setting_definition_id, value_json").eq("show_id", episode.show_id),
+    supabase.from("show_setting_definitions").select("id, label"),
+  ]);
+
+  // Build user maps (merge assigned users with comment authors)
+  const commentUserIds = [...new Set((comments ?? []).map((c) => c.user_id))];
+  const missingUserIds = commentUserIds.filter((id) => !assignedUserIds.includes(id));
+  const { data: extraUsers } = missingUserIds.length
+    ? await supabase.from("users").select("id, full_name, avatar_url").in("id", missingUserIds)
     : { data: [] };
 
-  // Fetch existing block responses for all tasks
-  const { data: blockResponses } = taskIds.length
-    ? await supabase
-        .from("task_block_responses")
-        .select("*")
-        .in("task_id", taskIds)
-    : { data: [] };
+  const allUsers = [...(assignedUsers ?? []), ...(extraUsers ?? [])];
+  const fullUserMap = Object.fromEntries(allUsers.map((u) => [u.id, u.full_name]));
+  const fullUserAvatarMap = Object.fromEntries(allUsers.map((u) => [u.id, u.avatar_url ?? null]));
 
-  // Fetch comments for all tasks
-  const { data: comments } = taskIds.length
-    ? await supabase
-        .from("task_comments")
-        .select("*")
-        .in("task_id", taskIds)
-        .order("created_at")
-    : { data: [] };
-
-  // Fetch all comment author names + all people for @mentions
-  const commentUserIds = [
-    ...new Set((comments ?? []).map((c) => c.user_id)),
-  ];
-  const allUserIds = [
-    ...new Set([...assignedUserIds, ...commentUserIds]),
-  ];
-  const { data: allUsers } = allUserIds.length
-    ? await supabase
-        .from("users")
-        .select("id, full_name, avatar_url")
-        .in("id", allUserIds)
-    : { data: [] };
-  const fullUserMap = Object.fromEntries(
-    (allUsers ?? []).map((u) => [u.id, u.full_name])
-  );
-  const fullUserAvatarMap = Object.fromEntries(
-    (allUsers ?? []).map((u) => [u.id, u.avatar_url ?? null])
-  );
-
-  // People for @mention dropdown
-  const { data: allPeople } = await supabase
-    .from("users")
-    .select("id, full_name")
-    .order("full_name");
-
-  // Fetch roles for assignment tab
-  const { data: roles } = await supabase
-    .from("roles")
-    .select("id, name")
-    .order("display_order");
-
-  // Fetch show role assignments for role resolution
-  const { data: showRoleAssignments } = await supabase
-    .from("show_role_assignments")
-    .select("role_id, user_id")
-    .eq("show_id", episode.show_id);
-
-  // Fetch show setting definitions for visibility rules
-  const { data: allSettingDefs } = await supabase
-    .from("show_setting_definitions")
-    .select("id, label")
-    .order("display_order");
-
-  // Email templates for tasks with send_email actions
-  const { data: emailTemplates } = templateIds.length
-    ? await supabase
-        .from("task_template_email_templates")
-        .select("*")
-        .in("task_template_id", templateIds)
-    : { data: [] };
-
-  // Show settings for token resolution
-  const { data: showSettings } = await supabase
-    .from("show_setting_values")
-    .select("setting_definition_id, value_json")
-    .eq("show_id", episode.show_id);
-
-  const { data: settingDefs } = await supabase
-    .from("show_setting_definitions")
-    .select("id, label");
-
-  // Build show settings map: label → value
+  // Build show settings map: label -> value
   const settingDefMap = new Map((settingDefs ?? []).map((d) => [d.id, d.label]));
   const showSettingsMap: Record<string, string> = {};
   for (const sv of showSettings ?? []) {
@@ -208,7 +129,7 @@ export default async function EpisodeDetailPage({
       showRoleAssignments={showRoleAssignments ?? []}
       dateRules={dateRules ?? []}
       taskTemplatesForRules={taskTemplatesForRules ?? []}
-      isAdminUser={isAdmin(await getCurrentUser())}
+      isAdminUser={isAdmin(currentUser)}
     />
   );
 }
