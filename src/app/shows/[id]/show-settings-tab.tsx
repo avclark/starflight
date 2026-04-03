@@ -110,6 +110,7 @@ export function ShowSettingsTab({
         <div key={def.id} className="space-y-2">
           <Label className="text-sm font-medium">{def.label}</Label>
           <SettingInput
+            id={def.id}
             fieldType={def.field_type}
             value={draft[def.id]}
             onChange={(val) => updateValue(def.id, val)}
@@ -134,11 +135,13 @@ export function ShowSettingsTab({
 }
 
 function SettingInput({
+  id,
   fieldType,
   value,
   onChange,
   options,
 }: {
+  id: string;
   fieldType: string;
   value: Json | null;
   onChange: (val: Json | null) => void;
@@ -154,7 +157,7 @@ function SettingInput({
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="radio"
-              name={`setting-${Math.random()}`}
+              name={`setting-${id}`}
               checked={current === "yes"}
               onChange={() => onChange(true)}
               className="accent-primary"
@@ -164,7 +167,7 @@ function SettingInput({
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="radio"
-              name={`setting-${Math.random()}`}
+              name={`setting-${id}`}
               checked={current === "no"}
               onChange={() => onChange(false)}
               className="accent-primary"
