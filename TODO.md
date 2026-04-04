@@ -1,23 +1,39 @@
-1. I should be able to Update task names inside an episode
-2. I should be able to add content clocks to a task when inside an episode (not just inside the process builder). These updates would of course, just be one-offs. They would not propogate to anything but this one instance of an episode. Basically the tasks rows should function the same inside an episode instance as they do in the process builder. All the same functionality. They should look the same too (but that will probably come in the UI.) Currently in the process builder, it let's me add blocks, but I can't see what it wold look like in an actual episode. In an episode I can see the front end of a block, but can't modify it or add any others. 
-   1. I've attached a couple screenshots of how this functionality should work (not necessarily how it should look). These screenshots are inside PK's process builder, but again, the process builder and an episode instance of that process should look and function the same. The first screenshot is a task with one ToDo block. You can see below there is a text button for a new block. The second screenshot shows what it looks like when I click that button. The third screenshot shows when I select a radio button block. The fourth screenshot shows after I filled in some details and saved that block. The fifth screenshot shows me clicking the three dots to the right of that block and shows the options I should have (namely to edit the block through block settings).
-3. Update / edit people names and email addresses. Currently I can only add new people or delete existing people. But each person should have a profile page 
-4. Tasks should be drag and droppable. I should be able to rearrange tasks by dragging and dropping. Again, since the process builder and an episode instance should be the same, I should be able to drag and drop whether I'm in the process builder or in an episode instance. 
-7. I need the ability to duplicate tasks, whether in a specific episode instance, or when creating a process. When I click the + or "+ Add Task" button, it should give me a popup that lets me choose blank task (this would be the default, so if it's a blank task I can just hit enter and create it), or give me to dropdowns. The first dropdown would let me choose the process, and the second dropdown would let me choose the task within that process. If I do that, it would duplicate that tasks (with all of its blocks and settings) into the current process or episode I'm working on. If there is a cleaner way to implement this than two dropdowns, please let me know. 
-8. Let's move the show settings page (where I set all the show's settings) from the main nav in the sidebar and have it live under Shows. So when I click on Shows from the main nav, it takes me to a list of all shows (as it currently does), but then there is another tab called Settings and that's where I can set the various settings. 
-9. For the types of fields that I should be able to add to Settings page, see screenshot 9.
-10. Performance optimization pass — optimistic UI, realtime subscriptions, prefetching, DB indexes
-11. Implement real auth / user accounts
-12. Implement the ability to send emails, slack notifications, etc. 
-13. Regarding email and notification functionality — Whenever a user is assigned to a task (whether automatically through a role assignment, or directly) they should get an email alert and a notification in the notifications section of the app. I would also like for them to receive a slack notification as well, but not sure the best way to implement that. Here is a list of the times a user should be notified/receive an email:
-    1.  When I am assigned to Task(s)
-    2.  When a task that I am assigned to Is Starting
-    3.  When a task that I am assigned to Becomes due
-    4.  When someone mentions me in a Comment
-14. 13 cont. — Each user should be able to set their notification preferences, but they should all be turned on by default. See screenshot 10. For now, users should have a profile page where they can set First Name, Last Name, Email, upload an avatar, and set time zone. And they should have a Notification Settings page which I referenced above. 
-15. User avatars should show up next to their name similar to how logos/artwork shows up next to show names (see screenshot 8)
-16. Full UI pass - this step will affect some of the functionality, so I'm not sure if that functionality should be broken out and built before the design pass or not. For example, each new client/show should have a spot where I can upload a logo. In our case, this would be the show artwork. And that would show up next to the client name in their settings screen (screenshot 6), and whenever the client is list on the shows page (screenshot 7).
 
-1. Global search
-2. user avatar next to notifications in top right
-3. 
+1. An action history of everything that has happened on an episode instance with date/time, user, action taken, etc.
+2. Rearranging where things are - e.g. moving assignments to three dot menu on tasks
+3. Need to be able to archive episodes, processes, workflows, and shows. 
+4. Dropdown a the top right on each episode with additional functions. This is where the archive option could go. Also needs a function called "update from process" where I can update this episode with any changes to the process that have occured since creating the episode. This one is tricky because it needs to update the episode, but not overwrite anything except for the specific things that have been changed in the process.
+5. 
+
+What is the best way to run a dev/staging version of the app where I can continue to test/add features, and then deploy them to the live app without overwriting all the existing episodes and work, etc.?
+
+
+
+## Design
+1. I really like the look of linear.app website. (what we used to model the search functionality). Great typography (mostly Inter), great spacing, etc. But it is a website and not a dashboard. But there's a pic of a dashboard on the homepage that I really like the look of. 
+2. I like this dashbaord and it's use of color. Though I'm torn on using a lot of color or keeping it pretty monotone with little pops of color. I like the sidebar / title bar convention here, where the sidebar stays collapsed and can be expanded. Since there really isn't much in the sidebar, especially for normal Users, we need to think of the best way to handle it. I think it could stay collapsedby default and just slide out on hover, which no actuall state where it stays open. 
+3. Something about this one is very appealing. I like the use of subtle color and graidents. I even like the nav style. 
+4. Another example of subtle graidents and a dark sidebar.
+5. I love this design. The color, the type, everything about it. 
+6. I love this style of design. The colors, the type, the layout. I love swiss-inspired design. Not sure how well it would work for an app dashboard though. 
+7. This is an interesting red on red color combination that caught my eye.
+8. Another dashboard I like
+9. This is a great example of a light dashboard that feels highly polished and with a minimal color scheme. I love the level of detail. All the little rounded edges. How the main content area feels like it's sitting on top of the canvas that the sidebar is part of. Perfect spacing and detail. 
+10. Another example of nice gradients and how the main content is kind of top of the layer with the sidebar and the header. 
+11. A nice mix of light ad dark elements
+12. I like how the sidebar and header are differentiated from the main content area. I do NOT lke this typography. 
+
+
+
+## Naming
+- Showrunner — This is my top pick. It's the entertainment industry term for the person who runs a show's production end to end. It maps perfectly to what the app does, it's immediately evocative for anyone in media production, and the domain showrunner.app or similar might be available. It also has a nice double meaning: the app that runs your shows.
+- Greenroom — The backstage space where everything comes together before the show goes live. Suggests preparation, coordination, behind-the-scenes work.
+- Cuesheet — A production document that lists everything that happens in sequence during a show. Maps well to the ordered-process architecture.
+- Postboard — Plays on "post-production" + "board." More niche but clearly production-oriented.
+- Mixdown — An audio term for the final mix. Suggests bringing everything together into a finished product.
+
+
+
+## Dashboards
+- https://github.com/satnaing/shadcn-admin
+- https://github.com/kiranism/next-shadcn-dashboard-starter

@@ -9,15 +9,23 @@ export default async function LoginPage() {
   if (user) redirect("/dashboard");
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Starflight</h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to your account
-          </p>
+    <div className="container grid h-svh max-w-none items-center justify-center">
+      <div className="mx-auto flex w-full flex-col justify-center space-y-2 py-8 sm:w-[480px] sm:p-8">
+        <div className="mb-4 flex items-center justify-center">
+          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-foreground text-background mr-2">
+            <span className="text-sm font-bold">S</span>
+          </div>
+          <h1 className="text-xl font-medium">Starflight</h1>
         </div>
-        <LoginForm />
+        <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">Sign in</h2>
+            <p className="text-sm text-muted-foreground">
+              Enter your email and password below to log into your account
+            </p>
+          </div>
+          <LoginForm />
+        </div>
       </div>
     </div>
   );

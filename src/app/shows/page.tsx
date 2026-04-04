@@ -20,7 +20,7 @@ export default async function ShowsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Shows</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Shows</h1>
       <Tabs defaultValue="shows">
         <TabsList>
           <TabsTrigger value="shows">Shows</TabsTrigger>

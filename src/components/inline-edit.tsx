@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 export function InlineEdit({
   value,
   onSave,
-  className = "text-2xl font-semibold tracking-tight",
+  className = "text-2xl font-bold tracking-tight",
 }: {
   value: string;
   onSave: (newValue: string) => Promise<void>;

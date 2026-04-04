@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export async function AppShell({
   children,
@@ -10,18 +11,27 @@ export async function AppShell({
 }) {
   const user = await getCurrentUser();
 
-  // No sidebar for unauthenticated users (login page, etc.)
   if (!user) {
     return <>{children}</>;
   }
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <AppSidebar userRole={user.role} />
-      <SidebarInset>
-        <AppHeader />
-        <div className="flex-1 p-6">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={true}>
+        <AppSidebar
+          userRole={user.role}
+          user={{
+            id: user.id,
+            full_name: user.full_name,
+            email: user.email,
+            avatar_url: user.avatar_url,
+          }}
+        />
+        <SidebarInset className="@container/content">
+          <AppHeader />
+          <main className="px-4 py-6">{children}</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

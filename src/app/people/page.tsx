@@ -24,7 +24,7 @@ export default async function PeoplePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">People</h1>
+      <h1 className="text-2xl font-bold tracking-tight">People</h1>
       <Tabs defaultValue="people">
         <TabsList>
           <TabsTrigger value="people">People</TabsTrigger>

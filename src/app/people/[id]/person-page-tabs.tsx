@@ -85,7 +85,7 @@ export function PersonPageTabs({
           size="lg"
         />
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight">
             {person.full_name}
           </h1>
           <p className="text-sm text-muted-foreground">{person.email}</p>
