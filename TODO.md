@@ -38,3 +38,12 @@ What is the best way to run a dev/staging version of the app where I can continu
 ## Dashboards
 - https://github.com/satnaing/shadcn-admin
 - https://github.com/kiranism/next-shadcn-dashboard-starter
+- https://github.com/shadcnstore/shadcn-dashboard-landing-template
+- https://github.com/arhamkhnz/next-shadcn-admin-dashboard
+
+## Dashboard Design
+- https://chakra-nextjs-dashboard.vercel.app/dashboard
+
+## Fonts
+Gabarito
+Degular
