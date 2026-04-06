@@ -86,7 +86,7 @@ export default async function ShowDetailPage({
     .eq("show_id", id);
 
   return (
-    <div className="space-y-6">
+    <>
       <ShowHeader showId={id} name={show.name} avatarUrl={show.avatar_url} />
 
       <Tabs defaultValue="settings">
@@ -170,6 +170,6 @@ export default async function ShowDetailPage({
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </>
   );
 }

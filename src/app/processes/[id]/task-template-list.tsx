@@ -141,7 +141,7 @@ function AssignmentSection({
             </SelectContent>
           </Select>
         )}
-        <Button size="sm" variant="secondary" onClick={handleSave} disabled={saving}>
+        <Button size="sm" onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>

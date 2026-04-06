@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { ClientDateRange } from "@/components/client-date";
 import {
   ArrowDown,
   ArrowDownToLine,
-  ArrowLeft,
   ArrowUp,
   ArrowUpToLine,
   Check,
@@ -1271,13 +1269,8 @@ export function EpisodeDetail({
     : tasks;
 
   return (
-    <div className="space-y-6">
+    <>
       <div className="flex items-center gap-3">
-        <Link href={`/workflows/${workflowId}`}>
-          <Button variant="ghost" size="icon-sm">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
         <div className="flex-1">
           <InlineEdit
             value={episode.title}
@@ -1465,6 +1458,6 @@ export function EpisodeDetail({
           />
         </div>
       )}
-    </div>
+    </>
   );
 }

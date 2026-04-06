@@ -23,8 +23,10 @@ export default async function PeoplePage() {
     .select("*");
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">People</h1>
+    <>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">People</h1>
+      </div>
       <Tabs defaultValue="people">
         <TabsList>
           <TabsTrigger value="people">People</TabsTrigger>
@@ -45,6 +47,6 @@ export default async function PeoplePage() {
           />
         </TabsContent>
       </Tabs>
-    </div>
+    </>
   );
 }

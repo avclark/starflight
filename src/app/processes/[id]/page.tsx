@@ -68,7 +68,7 @@ export default async function ProcessDetailPage({
     .select("*");
 
   return (
-    <div className="space-y-6">
+    <>
       <ProcessHeader processId={id} name={processData.name} />
       <TaskTemplateList
         processId={id}
@@ -83,6 +83,6 @@ export default async function ProcessDetailPage({
         completionActions={completionActions ?? []}
         emailTemplates={emailTemplates ?? []}
       />
-    </div>
+    </>
   );
 }

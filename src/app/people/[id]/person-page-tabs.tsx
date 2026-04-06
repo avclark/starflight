@@ -3,9 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { isPast } from "date-fns";
-import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientDate, ClientDateRange } from "@/components/client-date";
@@ -72,13 +70,8 @@ export function PersonPageTabs({
   }
 
   return (
-    <div className="space-y-6">
+    <>
       <div className="flex items-center gap-3">
-        <Link href="/people">
-          <Button variant="ghost" size="icon-sm">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
         <UserAvatar
           name={person.full_name}
           avatarUrl={person.avatar_url}
@@ -246,6 +239,6 @@ export function PersonPageTabs({
           <PersonProfile person={person} canEditRole={canEditRole} />
         </TabsContent>
       </Tabs>
-    </div>
+    </>
   );
 }

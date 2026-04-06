@@ -16,7 +16,7 @@ export default async function WorkflowsPage() {
     .order("name");
 
   return (
-    <div className="space-y-6">
+    <>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Workflows</h1>
       </div>
@@ -24,6 +24,6 @@ export default async function WorkflowsPage() {
         workflows={workflows ?? []}
         processes={processes ?? []}
       />
-    </div>
+    </>
   );
 }

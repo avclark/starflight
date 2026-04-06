@@ -57,7 +57,7 @@ export default async function WorkflowDetailPage({
   }));
 
   return (
-    <div className="space-y-6">
+    <>
       <WorkflowHeader
         workflowId={id}
         workflowName={workflow.name}
@@ -73,6 +73,6 @@ export default async function WorkflowDetailPage({
         episodes={episodesWithShows}
         shows={shows ?? []}
       />
-    </div>
+    </>
   );
 }

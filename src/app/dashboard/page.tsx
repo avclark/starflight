@@ -83,8 +83,10 @@ export default async function DashboardPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+    <>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+      </div>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -168,6 +170,6 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

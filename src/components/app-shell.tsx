@@ -29,7 +29,7 @@ export async function AppShell({
         />
         <SidebarInset className="@container/content">
           <AppHeader />
-          <main className="px-4 py-6">{children}</main>
+          <main className="flex flex-1 flex-col gap-4 px-4 py-6 sm:gap-6">{children}</main>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
